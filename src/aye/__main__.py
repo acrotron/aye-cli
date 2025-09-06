@@ -10,7 +10,7 @@ from .snapshot import (
     restore_snapshot,
 )
 
-app = typer.Typer(help="Aye – AI‑Zap terminal assistant with snapshot/undo")
+app = typer.Typer(help="Aye: AI‑powered coding assistant for the terminal")
 
 # ----------------------------------------------------------------------
 # Authentication commands

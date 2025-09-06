@@ -1,7 +1,7 @@
 [project]
-name = "aye"                     # the name that will appear on PyPI
-version = "0.1.0"
-description = "CLI AI‑Copilot assistant"
+name = "aye-cli"                     # the name that will appear on PyPI
+version = "0.1.1"
+description = "Aye: AI‑powered coding assistant for the terminal"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}

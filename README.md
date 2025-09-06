@@ -1,7 +1,7 @@
 # aye
-Command-Line Interface AI-Copilot tool
+Aye: AI‑powered coding assistant for the terminal
 
-**Aye** is a tiny terminal‑only AI assistant that:
+**Aye** is a terminal‑only AI assistant that:
 
 * generates code from natural‑language prompts,
 * automatically snapshots the target file before each change,
@@ -14,7 +14,7 @@ Command-Line Interface AI-Copilot tool
 
 ```bash
 # Install from PyPI
-pip install aye
+pip install aye-cli
 
 # Authenticate (you’ll get a token from your backend)
 aye login
@@ -51,7 +51,7 @@ Packaging & distribution
 python -m build
 
 # Install the wheel locally for a clean test
-pip install dist/aye-0.1.0-py3-none-any.whl
+pip install dist/aye_cli-0.1.0-py3-none-any.whl
 
 The console script aye will be available on the PATH.
 License
