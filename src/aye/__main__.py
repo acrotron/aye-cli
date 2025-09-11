@@ -3,7 +3,7 @@ import typer
 
 from .auth import login_flow, delete_token
 from .repl import chat_repl
-from .api import generate
+from .api import cli_invoke
 from .snapshot import (
     create_snapshot,
     list_snapshots,
@@ -56,7 +56,7 @@ def generate_cmd(
     if file:
         create_snapshot(file)          # ← undo point
 
-    resp = generate(prompt, filename=str(file) if file else None, mode=mode)
+    resp = invoke_cli(prompt, filename=str(file) if file else None, mode=mode)
     code = resp.get("generated_code", "")
 
     if file:
