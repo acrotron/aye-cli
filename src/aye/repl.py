@@ -8,11 +8,12 @@ from rich import print as rprint
 
 from .api import cli_invoke
 from .snapshot import create_snapshot
+from .source_collector import collect_sources
 
 
 def chat_repl(file: Optional[Path] = None) -> None:
     session = PromptSession(history=InMemoryHistory())
-    rprint("[bold cyan]Aye REPL – type /exit or Ctrl‑D to quit[/]")
+    rprint("[bold cyan]Aye CLI – type /exit or Ctrl‑D to quit[/]")
 
     while True:
         try:
@@ -25,7 +26,8 @@ def chat_repl(file: Optional[Path] = None) -> None:
             #prompt = session.prompt("(⊙_⊙) » ")
             #prompt = session.prompt("{•_・} » ")
             #prompt = session.prompt("{olO} » ")
-            prompt = session.prompt("{•_•} » ")
+            #prompt = session.prompt("{•_•} » ")
+            prompt = session.prompt("-{•_•}- » ")
             #prompt = session.prompt("{o_o} » ")
             #prompt = session.prompt("{⌐■_■} » ")
         except (EOFError, KeyboardInterrupt):
@@ -38,8 +40,11 @@ def chat_repl(file: Optional[Path] = None) -> None:
         try:
             #resp = generate(prompt, filename=str(file) if file else None)
             #code = resp.get("generated_code", "")
-            resp = cli_invoke(message=prompt, chat_id=172) 
-            rprint(f"[green] {resp.get('assistant_response')}")
+            folder = "aye"
+            source_files = collect_sources(folder)
+            resp = cli_invoke(message=prompt, chat_id=181, source_files=source_files) 
+            #rprint(f"[green] {resp.get('assistant_response')}")
+            rprint(f"[gray] {resp.get('assistant_response')}")
         except Exception as exc:
             rprint(f"[red]Error:[/] {exc}")
             continue

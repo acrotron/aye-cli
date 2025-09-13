@@ -23,20 +23,20 @@ def login(
         help="Login page that returns a one‑time token",
     )
 ):
-    """Open a browser, obtain a token, and store it locally."""
+    """Configure username and token for authenticating with the aye service."""
     login_flow(url)
 
 
 @app.command()
 def logout():
-    """Remove the stored auth token."""
+    """Remove the stored aye credentials."""
     delete_token()
     typer.secho("🔐 Token removed.", fg=typer.colors.GREEN)
 
 # ----------------------------------------------------------------------
 # One‑shot generation
 # ----------------------------------------------------------------------
-@app.command()
+#@app.command()
 def generate_cmd(
     prompt: str = typer.Argument(..., help="Prompt for the LLM"),
     file: Path = typer.Option(

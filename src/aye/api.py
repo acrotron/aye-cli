@@ -19,10 +19,11 @@ def _auth_headers() -> Dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def cli_invoke(user_id="XXX@acrotron.com", chat_id=-1, message=""):
-    payload = {"user_id": user_id, "chat_id": chat_id, "message": message}
+def cli_invoke(user_id="XXX@acrotron.com", chat_id=-1, message="", source_files={}):
+    payload = {"user_id": user_id, "chat_id": chat_id, "message": message, "source_files": source_files}
 
-    url = f"{BASE_URL}/invoke_cli"
+    #url = f"{BASE_URL}/invoke_cli"
+    url = f"{BASE_URL}/invoke"
 
     with httpx.Client(timeout=TIMEOUT, verify=True) as client:
         resp = client.post(url, json=payload, headers=_auth_headers())
