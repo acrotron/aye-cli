@@ -1,5 +1,6 @@
 from pathlib import Path
 import typer
+from types import SimpleNamespace
 
 from .auth import login_flow, delete_token
 from .repl import chat_repl
@@ -70,12 +71,21 @@ def generate_cmd(
 # ----------------------------------------------------------------------
 @app.command()
 def chat(
-    file: Path = typer.Option(
-        None, "--file", "-f", help="File to edit while chatting"
-    )
+    root: Path = typer.Option(
+        ".", "--root", "-r", help="Root folder where source files are located."
+    ),
+    file_mask: str = typer.Option(
+        "*.py", "--file-mask", "-m", help="File mask for source files to include into generation."
+    ),
+    #file: Path = typer.Option(
+    #    None, "--file", "-f", help="File to edit while chatting"
+    #)
 ):
     """Start an interactive REPL. Use /exit or Ctrl‑D to leave."""
-    chat_repl(file)
+    conf = SimpleNamespace()
+    conf.root = root
+    conf.file_mask = file_mask
+    chat_repl(conf)
 
 # ----------------------------------------------------------------------
 # Snapshot / undo sub‑commands

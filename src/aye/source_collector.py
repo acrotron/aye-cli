@@ -1,24 +1,31 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any, Set
 
 
-def collect_sources(root_dir="aye"):
+def collect_sources(
+    root_dir: str = "aye",
+    file_mask: str = "*.py",
+    recursive: bool = True,
+) -> Dict[str, str]:
     sources: Dict[str, str] = {}
-
-    # Resolve the directory – works with relative or absolute paths
     base_path = Path(root_dir).expanduser().resolve()
 
     if not base_path.is_dir():
         raise NotADirectoryError(f"'{root_dir}' is not a valid directory")
 
-    # Iterate over all .py files (non‑recursive)
-    for py_file in base_path.glob("*.py"):
+    # Choose iterator based on ``recursive`` flag
+    iterator = base_path.rglob(file_mask) if recursive else base_path.glob(file_mask)
+
+    for py_file in iterator:
+        if not py_file.is_file():
+            continue
         try:
             content = py_file.read_text(encoding="utf-8")
-            sources[py_file.name] = content
+            rel_key = py_file.relative_to(base_path).as_posix()
+            sources[rel_key] = content
         except UnicodeDecodeError:
-            # Skip files that aren't valid UTF‑8; you could log or raise instead
-            print(f"⚠️  Skipping non‑UTF8 file: {py_file}")
+            # Skip non‑UTF8 files
+            print(f"   Skipping non‑UTF8 file: {py_file}")
 
     return sources
 
