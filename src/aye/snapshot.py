@@ -4,12 +4,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
-SNAP_ROOT = Path.home() / ".aye/snapshots"
+SNAP_ROOT = Path(".aye/snapshots").resolve()
 
 
 def _snapshot_dir(file_path: Path) -> Path:
-    """Directory that will hold snapshots for *file_path*."""
-    rel = file_path.relative_to(file_path.anchor)   # strip leading “/”
+    """Directory that will hold snapshots for *file_path*.
+    Snapshots are stored in `.aye/snapshots` relative to the current directory."""
+    file_path = file_path.resolve()  # Ensure absolute path for safety
+    cwd = Path.cwd()
+    try:
+        rel = file_path.relative_to(cwd)
+    except ValueError:
+        # If file is not under cwd, use the full absolute path (relative to root)
+        rel = file_path
     return SNAP_ROOT / rel.parent
 
 
@@ -90,5 +97,3 @@ def update_files_with_snapshots(updated_files: List[dict]) -> None:
             file_path.write_text(file_content)
         except Exception as e:
             print(f"Error: Failed to update {file_name}: {e}")
-
-
