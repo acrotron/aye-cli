@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
-SNAP_ROOT = Path.home() / ".aye_snapshots"
+SNAP_ROOT = Path.home() / ".aye/snapshots"
 
 
 def _snapshot_dir(file_path: Path) -> Path:
@@ -55,4 +55,40 @@ def restore_snapshot(file_path: Path, timestamp: str) -> None:
             shutil.copy2(snap_path, file_path)
             return
     raise ValueError(f"No snapshot for {file_path} with timestamp {timestamp}")
+
+
+def update_files_with_snapshots(updated_files: List[dict]) -> None:
+    """Create snapshots for all files mentioned and update their content.
+
+    Args:
+        updated_files: List of dictionaries with 'file_name' and 'file_content' keys
+    """
+    for file_info in updated_files:
+        file_name = file_info.get("file_name")
+        file_content = file_info.get("file_content")
+
+        if not file_name or file_content is None:
+            print(f"Warning: Skipping invalid file info: {file_info}")
+            continue
+
+        file_path = Path(file_name)
+
+        # Create snapshot before updating
+        try:
+            create_snapshot(file_path)
+        except FileNotFoundError:
+            # If file doesn't exist, ensure its parent directory exists and create an empty file
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text("")
+            create_snapshot(file_path)
+        except Exception as e:
+            print(f"Warning: Failed to create snapshot for {file_name}: {e}")
+            continue
+
+        # Update file content
+        try:
+            file_path.write_text(file_content)
+        except Exception as e:
+            print(f"Error: Failed to update {file_name}: {e}")
+
 
