@@ -42,7 +42,7 @@ def chat_repl(conf) -> None:
         except (EOFError, KeyboardInterrupt):
             break
 
-        if prompt.strip() in {"/exit", "/quit", "exit", "quit"}:
+        if prompt.strip() in {"/exit", "/quit", "exit", "quit", ":q"}:
             break
 
         if prompt.strip() in {"/history", "history"}:
