@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.spinner import Spinner  # Import Spinner
 
 from .api import cli_invoke
-from .snapshot import apply_updates
+from .snapshot import apply_updates, list_snapshots
 from .source_collector import collect_sources
 
 
@@ -30,6 +30,17 @@ def chat_repl(conf) -> None:
 
         if prompt.strip() in {"/exit", "/quit"}:
             break
+
+        if prompt.strip() == "/history":
+            # Show snapshot history
+            timestamps = list_snapshots()
+            if not timestamps:
+                rprint("[yellow]No snapshots found.[/]")
+            else:
+                rprint("[bold]Snapshot History:[/]")
+                for ts in timestamps:
+                    rprint(f"  {ts}")
+            continue
 
         if not prompt.strip():
             continue

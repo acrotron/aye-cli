@@ -95,31 +95,12 @@ def history_cmd(
     file: Path = typer.Argument(None, help="File to list snapshots for")
 ):
     """Show timestamps of saved snapshots for *file* or all snapshots if no file provided."""
-    if file is None:
-        # List all snapshots in descending order with file names
-        timestamps = list_snapshots()
-        if not timestamps:
-            typer.echo("No snapshots found.")
-            raise typer.Exit()
-        for ts in timestamps:
-            # Read metadata to get file list
-            meta_path = Path(".aye/snapshots/batches") / ts / "metadata.json"
-            if meta_path.exists():
-                import json
-                meta = json.loads(meta_path.read_text())
-                files = [Path(entry["original"]).name for entry in meta["files"]]
-                files_str = ",".join(files)
-                typer.echo(f"{ts}  {files_str}")
-            else:
-                typer.echo(f"{ts}  (metadata missing)")
-    else:
-        # Original behavior for specific file
-        snaps = list_snapshots(file)
-        if not snaps:
-            typer.echo("No snapshots found.")
-            raise typer.Exit()
-        for ts, _ in snaps:
-            typer.echo(ts)
+    snapshots = list_snapshots(file)
+    if not snapshots:
+        typer.echo("No snapshots found.")
+        raise typer.Exit()
+    for snapshot in snapshots:
+        typer.echo(snapshot)
 
 
 @app.command("show")

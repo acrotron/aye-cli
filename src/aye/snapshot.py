@@ -20,6 +20,27 @@ def _ensure_batch_dir(ts: str) -> Path:
     return batch_dir
 
 
+def _list_all_snapshots_with_metadata():
+    """List all snapshots in descending order with file names from metadata."""
+    batches_root = SNAP_ROOT / "batches"
+    if not batches_root.is_dir():
+        return []
+
+    timestamps = [p.name for p in batches_root.iterdir() if p.is_dir()]
+    timestamps.sort(reverse=True)
+    result = []
+    for ts in timestamps:
+        meta_path = batches_root / ts / "metadata.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text())
+            files = [Path(entry["original"]).name for entry in meta["files"]]
+            files_str = ",".join(files)
+            result.append(f"{ts}  {files_str}")
+        else:
+            result.append(f"{ts}  (metadata missing)")
+    return result
+
+
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
@@ -56,15 +77,26 @@ def create_snapshot(file_paths: List[Path]) -> str:
     return ts
 
 
-def list_snapshots() -> List[str]:
-    """Return all batch‑snapshot timestamps, newest first."""
+def list_snapshots(file: Path | None = None) -> List[str]:
+    """Return all batch‑snapshot timestamps, newest first, or snapshots for a specific file."""
+    if file is None:
+        return _list_all_snapshots_with_metadata()
+    
     batches_root = SNAP_ROOT / "batches"
     if not batches_root.is_dir():
         return []
 
-    timestamps = [p.name for p in batches_root.iterdir() if p.is_dir()]
-    timestamps.sort(reverse=True)
-    return timestamps
+    snapshots = []
+    for batch_dir in batches_root.iterdir():
+        if batch_dir.is_dir():
+            meta_path = batch_dir / "metadata.json"
+            if meta_path.exists():
+                meta = json.loads(meta_path.read_text())
+                for entry in meta["files"]:
+                    if Path(entry["original"]) == file.resolve():
+                        snapshots.append((batch_dir.name, entry["snapshot"]))
+    snapshots.sort(key=lambda x: x[0], reverse=True)
+    return snapshots
 
 
 def restore_snapshot(timestamp: str | None = None) -> None:
@@ -132,4 +164,3 @@ def driver():
 
 if __name__ == "__main__":
     driver()
-
