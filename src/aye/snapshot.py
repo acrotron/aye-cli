@@ -34,7 +34,7 @@ SNAP_ROOT = Path(".aye/snapshots").resolve()
 def _ensure_batch_dir(ts: str) -> Path:
     """Create (or return) the batch directory for a given timestamp."""
     ordinal = _get_next_ordinal()
-    ordinal_str = f"{ordinal:04d}"
+    ordinal_str = f"{ordinal:03d}"
     batch_dir_name = f"{ordinal_str}_{ts}"
     batch_dir = SNAP_ROOT / batch_dir_name
     batch_dir.mkdir(parents=True, exist_ok=True)
@@ -158,21 +158,21 @@ def restore_snapshot(timestamp: str | None = None) -> None:
 # ------------------------------------------------------------------
 def apply_updates(updated_files: List[Dict[str, str]]) -> str:
     """
-    1※′ Take a snapshot of the *current* files.
-    2※′ Write the new contents supplied by the LLM.
+    1′′ Take a snapshot of the *current* files.
+    2′′ Write the new contents supplied by the LLM.
     Returns the batch timestamp (useful for UI feedback).
     """
-    # ---- 1※′ Build a list of Path objects for the files that will change ----
+    # ---- 1′′ Build a list of Path objects for the files that will change ----
     file_paths: List[Path] = [
         Path(item["file_name"])
         for item in updated_files
         if "file_name" in item and "file_content" in item
     ]
 
-    # ---- 2※′ Snapshot the *existing* state ----
+    # ---- 2′′ Snapshot the *existing* state ----
     batch_ts = create_snapshot(file_paths)
 
-    # ---- 3※′ Overwrite with the new content ----
+    # ---- 3′′ Overwrite with the new content ----
     for item in updated_files:
         fp = Path(item["file_name"])
         fp.parent.mkdir(parents=True, exist_ok=True)

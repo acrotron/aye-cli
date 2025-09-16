@@ -17,7 +17,7 @@ from rich.spinner import Spinner
 from .api import cli_invoke
 from .snapshot import apply_updates
 from .source_collector import collect_sources
-from .command import handle_restore_command, handle_history_command, handle_git_diff_command
+from .command import handle_restore_command, handle_history_command, handle_shell_command, _is_valid_command
 
 
 def chat_repl(conf) -> None:
@@ -42,32 +42,32 @@ def chat_repl(conf) -> None:
         except (EOFError, KeyboardInterrupt):
             break
 
-        if prompt.strip() in {"/exit", "/quit", "exit", "quit", ":q"}:
+        if not prompt.strip():
+            continue
+
+        # Tokenize input to check for commands
+        tokens = prompt.strip().split()
+        first_token = tokens[0].lower()
+
+        # Check for exit commands
+        if first_token in {"/exit", "/quit", "exit", "quit", ":q", "/q"}:
             break
 
-        if prompt.strip() in {"/history", "history"}:
+        # Check for history commands
+        if first_token in {"/history", "history"}:
             handle_history_command()
             continue
 
-        if prompt.strip() in {"/restore", "restore"}:
+        # Check for restore commands
+        if first_token in {"/restore", "restore"}:
             handle_restore_command(None)
             continue
 
-        if prompt.strip() in {"/git status", "git status"}:
-            try:
-                result = subprocess.run(["git", "status"], capture_output=True, text=True, check=True)
-                rprint(result.stdout)
-            except subprocess.CalledProcessError as e:
-                rprint(f"[red]Error running git status:[/] {e.stderr}")
-            continue
-
-        if prompt.strip().startswith(('/git diff', 'git diff')):
-            parts = prompt.strip().split()
-            file_name = parts[2] if len(parts) > 2 else None
-            handle_git_diff_command(file_name)
-            continue
-
-        if not prompt.strip():
+        # Handle shell commands with or without forward slash
+        command = first_token.lstrip('/')
+        if _is_valid_command(command):
+            args = tokens[1:]
+            handle_shell_command(command, args)
             continue
 
         spinner = Spinner("dots", text="[yellow]Thinking...[/]")
