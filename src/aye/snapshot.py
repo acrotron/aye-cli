@@ -1,58 +1,189 @@
+# --------------------------------------------------------------
+# snapshot.py – batch snapshot utilities (ordinal + timestamp folder)
+# --------------------------------------------------------------
 import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Dict, Any
 
-SNAP_ROOT = Path.home() / ".aye_snapshots"
-
-
-def _snapshot_dir(file_path: Path) -> Path:
-    """Directory that will hold snapshots for *file_path*."""
-    rel = file_path.relative_to(file_path.anchor)   # strip leading “/”
-    return SNAP_ROOT / rel.parent
-
-
-def create_snapshot(file_path: Path) -> Path:
-    """Copy the file to a timestamped backup and write a metadata JSON."""
-    if not file_path.is_file():
-        raise FileNotFoundError(str(file_path))
-
-    snap_dir = _snapshot_dir(file_path)
-    snap_dir.mkdir(parents=True, exist_ok=True)
-
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
-    snap_file = snap_dir / f"{file_path.name}.{ts}.bak"
-    shutil.copy2(file_path, snap_file)
-
-    meta = {
-        "original": str(file_path),
-        "snapshot": str(snap_file),
-        "timestamp": ts,
-    }
-    (snap_dir / f"{file_path.name}.{ts}.json").write_text(json.dumps(meta))
-    return snap_file
+def _get_next_ordinal() -> int:
+    """Get the next ordinal number by checking existing snapshot directories."""
+    batches_root = SNAP_ROOT
+    if not batches_root.is_dir():
+        return 1
+    
+    ordinals = []
+    for batch_dir in batches_root.iterdir():
+        if batch_dir.is_dir() and "_" in batch_dir.name:
+            try:
+                ordinal = int(batch_dir.name.split("_")[0])
+                ordinals.append(ordinal)
+            except ValueError:
+                continue
+    
+    return max(ordinals, default=0) + 1
 
 
-def list_snapshots(file_path: Path) -> List[Tuple[str, Path]]:
-    """Return a list of (timestamp, snapshot_path) sorted newest‑first."""
-    snap_dir = _snapshot_dir(file_path)
-    if not snap_dir.is_dir():
+SNAP_ROOT = Path(".aye/snapshots").resolve()
+
+
+# ------------------------------------------------------------------
+# Internal helpers
+# ------------------------------------------------------------------
+def _ensure_batch_dir(ts: str) -> Path:
+    """Create (or return) the batch directory for a given timestamp."""
+    ordinal = _get_next_ordinal()
+    ordinal_str = f"{ordinal:04d}"
+    batch_dir_name = f"{ordinal_str}_{ts}"
+    batch_dir = SNAP_ROOT / batch_dir_name
+    batch_dir.mkdir(parents=True, exist_ok=True)
+    return batch_dir
+
+
+def _list_all_snapshots_with_metadata():
+    """List all snapshots in descending order with file names from metadata."""
+    batches_root = SNAP_ROOT
+    if not batches_root.is_dir():
         return []
 
-    snaps = []
-    for meta_file in snap_dir.glob(f"{file_path.name}.*.json"):
-        meta = json.loads(meta_file.read_text())
-        snaps.append((meta["timestamp"], Path(meta["snapshot"])))
-    snaps.sort(reverse=True)
-    return snaps
+    timestamps = [p.name for p in batches_root.iterdir() if p.is_dir()]
+    timestamps.sort(reverse=True)
+    result = []
+    for ts in timestamps:
+        meta_path = batches_root / ts / "metadata.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text())
+            files = [Path(entry["original"]).name for entry in meta["files"]]
+            files_str = ",".join(files)
+            result.append(f"{ts}  {files_str}")
+        else:
+            result.append(f"{ts}  (metadata missing)")
+    return result
 
 
-def restore_snapshot(file_path: Path, timestamp: str) -> None:
-    """Replace *file_path* with the snapshot that matches *timestamp*."""
-    for ts, snap_path in list_snapshots(file_path):
-        if ts == timestamp:
-            shutil.copy2(snap_path, file_path)
-            return
-    raise ValueError(f"No snapshot for {file_path} with timestamp {timestamp}")
+# ------------------------------------------------------------------
+# Public API
+# ------------------------------------------------------------------
+def create_snapshot(file_paths: List[Path]) -> str:
+    """
+    Snapshot the **current** contents of the given files.
 
+    Returns the timestamp string that identifies the batch.
+    """
+    if not file_paths:
+        raise ValueError("No files supplied for snapshot")
+
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    batch_dir = _ensure_batch_dir(ts)
+
+    meta_entries: List[Dict[str, Any]] = []
+
+    for src_path in file_paths:
+        src_path = src_path.resolve()
+        dest_path = batch_dir / src_path.name
+
+        if src_path.is_file():
+            shutil.copy2(src_path, dest_path)   # copy old content
+        else:
+            dest_path.write_text("")           # placeholder for a new file
+
+        meta_entries.append(
+            {"original": str(src_path), "snapshot": str(dest_path)}
+        )
+
+    meta = {"timestamp": ts, "files": meta_entries}
+    (batch_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
+
+    return batch_dir.name
+
+
+def list_snapshots(file: Path | None = None) -> List[str]:
+    """Return all batch-snapshot timestamps, newest first, or snapshots for a specific file."""
+    if file is None:
+        return _list_all_snapshots_with_metadata()
+    
+    batches_root = SNAP_ROOT
+    if not batches_root.is_dir():
+        return []
+
+    snapshots = []
+    for batch_dir in batches_root.iterdir():
+        if batch_dir.is_dir():
+            meta_path = batch_dir / "metadata.json"
+            if meta_path.exists():
+                meta = json.loads(meta_path.read_text())
+                for entry in meta["files"]:
+                    if Path(entry["original"]) == file.resolve():
+                        snapshots.append((batch_dir.name, entry["snapshot"]))
+    snapshots.sort(key=lambda x: x[0], reverse=True)
+    return snapshots
+
+
+def restore_snapshot(timestamp: str | None = None) -> None:
+    """
+    Restore *all* files from a batch snapshot.
+    If ``timestamp`` is omitted the most recent snapshot is used.
+    """
+    if timestamp is None:
+        timestamps = list_snapshots()
+        if not timestamps:
+            raise ValueError("No snapshots found")
+        timestamp = timestamps[0].split()[0] if timestamps else None
+        if not timestamp:
+            raise ValueError("No snapshots found")
+
+    batch_dir = SNAP_ROOT / timestamp
+    if not batch_dir.is_dir():
+        raise ValueError(f"No snapshot found for timestamp {timestamp}")
+
+    meta_file = batch_dir / "metadata.json"
+    if not meta_file.is_file():
+        raise ValueError(f"Metadata missing for snapshot {timestamp}")
+
+    meta = json.loads(meta_file.read_text())
+
+    for entry in meta["files"]:
+        original = Path(entry["original"])
+        snapshot = Path(entry["snapshot"])
+        if not snapshot.is_file():
+            print(f"Warning: snapshot missing – {snapshot}")
+            continue
+        original.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(snapshot, original)
+
+
+# ------------------------------------------------------------------
+# Helper that combines snapshot + write-new-content
+# ------------------------------------------------------------------
+def apply_updates(updated_files: List[Dict[str, str]]) -> str:
+    """
+    1※′ Take a snapshot of the *current* files.
+    2※′ Write the new contents supplied by the LLM.
+    Returns the batch timestamp (useful for UI feedback).
+    """
+    # ---- 1※′ Build a list of Path objects for the files that will change ----
+    file_paths: List[Path] = [
+        Path(item["file_name"])
+        for item in updated_files
+        if "file_name" in item and "file_content" in item
+    ]
+
+    # ---- 2※′ Snapshot the *existing* state ----
+    batch_ts = create_snapshot(file_paths)
+
+    # ---- 3※′ Overwrite with the new content ----
+    for item in updated_files:
+        fp = Path(item["file_name"])
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_text(item["file_content"])
+
+    return batch_ts
+
+
+def driver():
+    list_snapshots()
+
+
+if __name__ == "__main__":
+    driver()
