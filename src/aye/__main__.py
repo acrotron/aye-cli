@@ -57,7 +57,7 @@ def generate_cmd(
     if file:
         create_snapshot(file)          # ← undo point
 
-    resp = invoke_cli(prompt, filename=str(file) if file else None, mode=mode)
+    resp = cli_invoke(prompt, filename=str(file) if file else None, mode=mode)
     code = resp.get("generated_code", "")
 
     if file:
@@ -88,27 +88,42 @@ def chat(
     chat_repl(conf)
 
 # ----------------------------------------------------------------------
-# Snapshot / undo sub‑commands
+# Snapshot commands (moved from snap subcommand)
 # ----------------------------------------------------------------------
-snap = typer.Typer(help="Snapshot / undo utilities")
-app.add_typer(snap, name="snap")
-
-
-@snap.command("list")
-def snap_list(
-    file: Path = typer.Argument(..., help="File to list snapshots for")
+@app.command("history")
+def history_cmd(
+    file: Path = typer.Argument(None, help="File to list snapshots for")
 ):
-    """Show timestamps of saved snapshots for *file*."""
-    snaps = list_snapshots(file)
-    if not snaps:
-        typer.echo("No snapshots found.")
-        raise typer.Exit()
-    for ts, _ in snaps:
-        typer.echo(ts)
+    """Show timestamps of saved snapshots for *file* or all snapshots if no file provided."""
+    if file is None:
+        # List all snapshots in descending order with file names
+        timestamps = list_snapshots()
+        if not timestamps:
+            typer.echo("No snapshots found.")
+            raise typer.Exit()
+        for ts in timestamps:
+            # Read metadata to get file list
+            meta_path = Path(".aye/snapshots/batches") / ts / "metadata.json"
+            if meta_path.exists():
+                import json
+                meta = json.loads(meta_path.read_text())
+                files = [Path(entry["original"]).name for entry in meta["files"]]
+                files_str = ",".join(files)
+                typer.echo(f"{ts}  {files_str}")
+            else:
+                typer.echo(f"{ts}  (metadata missing)")
+    else:
+        # Original behavior for specific file
+        snaps = list_snapshots(file)
+        if not snaps:
+            typer.echo("No snapshots found.")
+            raise typer.Exit()
+        for ts, _ in snaps:
+            typer.echo(ts)
 
 
-@snap.command("show")
-def snap_show(
+@app.command("show")
+def snap_show_cmd(
     file: Path = typer.Argument(..., help="File whose snapshot to show"),
     ts: str = typer.Argument(..., help="Timestamp of the snapshot"),
 ):
@@ -121,8 +136,8 @@ def snap_show(
     raise typer.Exit(code=1)
 
 
-@snap.command("undo")
-def snap_undo(
+@app.command("restore")
+def restore_cmd(
     ts: str = typer.Argument(None, help="Timestamp of the snapshot to restore (default: latest)"),
 ):
     """Replace all files with the latest snapshot or specified snapshot."""
