@@ -12,7 +12,7 @@ from rich.padding import Padding
 from rich.console import Console
 
 from .api import cli_invoke
-from .snapshot import create_snapshot, update_files_with_snapshots
+from .snapshot import apply_updates
 from .source_collector import collect_sources
 
 
@@ -38,7 +38,9 @@ def chat_repl(conf) -> None:
 
             # Update files with snapshots
             updated_files = assistant_resp.get("source_files", [])
-            update_files_with_snapshots(updated_files)
+            if updated_files:
+                batch_ts = apply_updates(updated_files) # snapshot + write
+                rprint(f"[green]✅ Batch snapshot created: {batch_ts}[/]")
 
             summary = assistant_resp.get("answer_summary")
             console = Console()

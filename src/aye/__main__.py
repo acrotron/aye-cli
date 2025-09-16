@@ -121,15 +121,17 @@ def snap_show(
     raise typer.Exit(code=1)
 
 
-@snap.command("revert")
-def snap_revert(
-    file: Path = typer.Argument(..., help="File to revert"),
-    ts: str = typer.Argument(..., help="Timestamp of the snapshot to restore"),
+@snap.command("undo")
+def snap_undo(
+    ts: str = typer.Argument(None, help="Timestamp of the snapshot to restore (default: latest)"),
 ):
-    """Replace the current file with a previous snapshot."""
+    """Replace all files with the latest snapshot or specified snapshot."""
     try:
-        restore_snapshot(file, ts)
-        typer.secho(f"✅ {file} restored to {ts}", fg=typer.colors.GREEN)
+        restore_snapshot(ts)
+        if ts:
+            typer.secho(f"✅ All files restored to {ts}", fg=typer.colors.GREEN)
+        else:
+            typer.secho(f"✅ All files restored to latest snapshot", fg=typer.colors.GREEN)
     except Exception as exc:
         typer.secho(f"Error: {exc}", err=True)
         raise typer.Exit(code=1)
@@ -137,5 +139,3 @@ def snap_revert(
 
 if __name__ == "__main__":
     app()
-
-
