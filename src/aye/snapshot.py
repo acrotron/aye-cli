@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
 
+
 def _get_next_ordinal() -> int:
     """Get the next ordinal number by checking existing snapshot directories."""
     batches_root = SNAP_ROOT
@@ -51,14 +52,21 @@ def _list_all_snapshots_with_metadata():
     timestamps.sort(reverse=True)
     result = []
     for ts in timestamps:
+        # Parse the ordinal and timestamp from the directory name
+        if "_" in ts:
+            ordinal_part, timestamp_part = ts.split("_", 1)
+            formatted_ts = f"{ordinal_part} ({timestamp_part})"
+        else:
+            formatted_ts = ts  # Fallback if format is unexpected
+            
         meta_path = batches_root / ts / "metadata.json"
         if meta_path.exists():
             meta = json.loads(meta_path.read_text())
             files = [Path(entry["original"]).name for entry in meta["files"]]
             files_str = ",".join(files)
-            result.append(f"{ts}  {files_str}")
+            result.append(f"{formatted_ts}  {files_str}")
         else:
-            result.append(f"{ts}  (metadata missing)")
+            result.append(f"{formatted_ts}  (metadata missing)")
     return result
 
 
@@ -133,9 +141,38 @@ def restore_snapshot(timestamp: str | None = None) -> None:
         if not timestamp:
             raise ValueError("No snapshots found")
 
+    # Handle both ordinal-only and full formatted timestamp inputs
+    actual_timestamp = None
+    
+    # Check if input is just the ordinal (e.g., "001")
+    if timestamp.isdigit() and len(timestamp) == 3:
+        # Find the snapshot directory that starts with this ordinal
+        for batch_dir in SNAP_ROOT.iterdir():
+            if batch_dir.is_dir() and batch_dir.name.startswith(f"{timestamp}_"):
+                actual_timestamp = timestamp
+                timestamp = batch_dir.name
+                break
+    
+    # If we have a full directory name or extracted it from ordinal
+    if "_" in timestamp:
+        # Extract actual timestamp from formatted version
+        parts = timestamp.split("_", 1)
+        if len(parts) == 2:
+            actual_timestamp = parts[1]  # The actual timestamp part
+    elif "(" in timestamp and ")" in timestamp:
+        # Handle the formatted timestamp (e.g., "001 (20250916T214101)")
+        actual_timestamp = timestamp.split("(")[1].split(")")[0]
+    
+    # If we couldn't extract actual timestamp, try using input directly
+    if actual_timestamp is None:
+        actual_timestamp = timestamp
+
     batch_dir = SNAP_ROOT / timestamp
     if not batch_dir.is_dir():
-        raise ValueError(f"No snapshot found for timestamp {timestamp}")
+        # Try with the full name if the above didn't work
+        batch_dir = SNAP_ROOT / timestamp
+        if not batch_dir.is_dir():
+            raise ValueError(f"No snapshot found for timestamp {timestamp}")
 
     meta_file = batch_dir / "metadata.json"
     if not meta_file.is_file():

@@ -8,6 +8,10 @@ from typing import Optional
 import typer
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.completion import PathCompleter
+from .completers import CmdPathCompleter
+from prompt_toolkit.shortcuts import CompleteStyle
+
 from rich import print as rprint
 from rich.text import Text
 from rich.padding import Padding
@@ -17,11 +21,16 @@ from rich.spinner import Spinner
 from .api import cli_invoke
 from .snapshot import apply_updates
 from .source_collector import collect_sources
-from .command import handle_restore_command, handle_history_command, handle_shell_command, _is_valid_command
+from .command import handle_restore_command, handle_history_command, handle_shell_command, _is_valid_command, handle_diff_command
 
 
 def chat_repl(conf) -> None:
-    session = PromptSession(history=InMemoryHistory())
+    session = PromptSession(
+        history=InMemoryHistory(),
+        completer=CmdPathCompleter(),
+        complete_style=CompleteStyle.READLINE_LIKE,   # “readline” style, no menu
+        complete_while_typing=False)
+
     rprint("[bold cyan]Aye CLI – type /exit or Ctrl‑D to quit[/]")
     console = Console()
 
@@ -61,6 +70,11 @@ def chat_repl(conf) -> None:
         # Check for restore commands
         if first_token in {"/restore", "restore"}:
             handle_restore_command(None)
+            continue
+
+        # Check for diff commands
+        if first_token in {"/diff", "diff"}:
+            handle_diff_command(tokens[1:])
             continue
 
         # Handle shell commands with or without forward slash
