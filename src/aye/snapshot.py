@@ -1,11 +1,29 @@
 # --------------------------------------------------------------
-# snapshot.py – batch snapshot utilities (single‑timestamp folder)
+# snapshot.py – batch snapshot utilities (ordinal + timestamp folder)
 # --------------------------------------------------------------
 import json
 import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
+
+def _get_next_ordinal() -> int:
+    """Get the next ordinal number by checking existing snapshot directories."""
+    batches_root = SNAP_ROOT
+    if not batches_root.is_dir():
+        return 1
+    
+    ordinals = []
+    for batch_dir in batches_root.iterdir():
+        if batch_dir.is_dir() and "_" in batch_dir.name:
+            try:
+                ordinal = int(batch_dir.name.split("_")[0])
+                ordinals.append(ordinal)
+            except ValueError:
+                continue
+    
+    return max(ordinals, default=0) + 1
+
 
 SNAP_ROOT = Path(".aye/snapshots").resolve()
 
@@ -15,14 +33,17 @@ SNAP_ROOT = Path(".aye/snapshots").resolve()
 # ------------------------------------------------------------------
 def _ensure_batch_dir(ts: str) -> Path:
     """Create (or return) the batch directory for a given timestamp."""
-    batch_dir = SNAP_ROOT / "batches" / ts
+    ordinal = _get_next_ordinal()
+    ordinal_str = f"{ordinal:04d}"
+    batch_dir_name = f"{ordinal_str}_{ts}"
+    batch_dir = SNAP_ROOT / batch_dir_name
     batch_dir.mkdir(parents=True, exist_ok=True)
     return batch_dir
 
 
 def _list_all_snapshots_with_metadata():
     """List all snapshots in descending order with file names from metadata."""
-    batches_root = SNAP_ROOT / "batches"
+    batches_root = SNAP_ROOT
     if not batches_root.is_dir():
         return []
 
@@ -65,7 +86,7 @@ def create_snapshot(file_paths: List[Path]) -> str:
         if src_path.is_file():
             shutil.copy2(src_path, dest_path)   # copy old content
         else:
-            dest_path.touch()                    # placeholder for a new file
+            dest_path.write_text("")           # placeholder for a new file
 
         meta_entries.append(
             {"original": str(src_path), "snapshot": str(dest_path)}
@@ -74,15 +95,15 @@ def create_snapshot(file_paths: List[Path]) -> str:
     meta = {"timestamp": ts, "files": meta_entries}
     (batch_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
 
-    return ts
+    return batch_dir.name
 
 
 def list_snapshots(file: Path | None = None) -> List[str]:
-    """Return all batch‑snapshot timestamps, newest first, or snapshots for a specific file."""
+    """Return all batch-snapshot timestamps, newest first, or snapshots for a specific file."""
     if file is None:
         return _list_all_snapshots_with_metadata()
     
-    batches_root = SNAP_ROOT / "batches"
+    batches_root = SNAP_ROOT
     if not batches_root.is_dir():
         return []
 
@@ -108,9 +129,11 @@ def restore_snapshot(timestamp: str | None = None) -> None:
         timestamps = list_snapshots()
         if not timestamps:
             raise ValueError("No snapshots found")
-        timestamp = timestamps[0]               # most recent
+        timestamp = timestamps[0].split()[0] if timestamps else None
+        if not timestamp:
+            raise ValueError("No snapshots found")
 
-    batch_dir = SNAP_ROOT / "batches" / timestamp
+    batch_dir = SNAP_ROOT / timestamp
     if not batch_dir.is_dir():
         raise ValueError(f"No snapshot found for timestamp {timestamp}")
 
@@ -131,25 +154,25 @@ def restore_snapshot(timestamp: str | None = None) -> None:
 
 
 # ------------------------------------------------------------------
-# Helper that combines snapshot + write‑new‑content
+# Helper that combines snapshot + write-new-content
 # ------------------------------------------------------------------
 def apply_updates(updated_files: List[Dict[str, str]]) -> str:
     """
-    1️⃣ Take a snapshot of the *current* files.
-    2️⃣ Write the new contents supplied by the LLM.
+    1※′ Take a snapshot of the *current* files.
+    2※′ Write the new contents supplied by the LLM.
     Returns the batch timestamp (useful for UI feedback).
     """
-    # ---- 1️⃣ Build a list of Path objects for the files that will change ----
+    # ---- 1※′ Build a list of Path objects for the files that will change ----
     file_paths: List[Path] = [
         Path(item["file_name"])
         for item in updated_files
         if "file_name" in item and "file_content" in item
     ]
 
-    # ---- 2️⃣ Snapshot the *existing* state ----
+    # ---- 2※′ Snapshot the *existing* state ----
     batch_ts = create_snapshot(file_paths)
 
-    # ---- 3️⃣ Overwrite with the new content ----
+    # ---- 3※′ Overwrite with the new content ----
     for item in updated_files:
         fp = Path(item["file_name"])
         fp.parent.mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,6 @@ from typing import Any, Dict
 
 import httpx
 from .auth import get_token
-#from auth import get_token
 
 # -------------------------------------------------
 # 👉  EDIT THIS TO POINT TO YOUR SERVICE
@@ -23,25 +22,8 @@ def cli_invoke(user_id="v@acrotron.com", chat_id=-1, message="", source_files={}
     payload = {"user_id": user_id, "chat_id": chat_id, "message": message, "source_files": source_files}
 
     url = f"{BASE_URL}/invoke_cli"
-    #url = f"{BASE_URL}/invoke"
 
     with httpx.Client(timeout=TIMEOUT, verify=True) as client:
         resp = client.post(url, json=payload, headers=_auth_headers())
         resp.raise_for_status()
         return resp.json()
-
-
-def driver():
-    user_id = "XXX@acrotron.com"
-    chat_id = -1
-    message = "This is a test"
-    #"model":"openai/gpt-oss-120b"
-
-    res = cli_invoke(user_id, chat_id, message)
-    #res = test()
-    print(res)
-
-
-if __name__ == '__main__':
-    driver()
-
