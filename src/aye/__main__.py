@@ -72,7 +72,7 @@ def generate_cmd(
 @app.command()
 def chat(
     root: Path = typer.Option(
-        ".", "--root", "-r", help="Root folder where source files are located."
+        None, "--root", "-r", help="Root folder where source files are located."
     ),
     file_mask: str = typer.Option(
         "*.py", "--file-mask", "-m", help="File mask for source files to include into generation."
@@ -82,6 +82,9 @@ def chat(
     #)
 ):
     """Start an interactive REPL. Use /exit or Ctrl‑D to leave."""
+    if root is None:
+        root = Path.cwd()
+    
     conf = SimpleNamespace()
     conf.root = root
     conf.file_mask = file_mask

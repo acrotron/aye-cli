@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 
+SNAP_ROOT = Path(".aye/snapshots").resolve()
+
 def _get_next_ordinal() -> int:
     """Get the next ordinal number by checking existing snapshot directories."""
     batches_root = SNAP_ROOT
@@ -25,8 +27,6 @@ def _get_next_ordinal() -> int:
     
     return max(ordinals, default=0) + 1
 
-
-SNAP_ROOT = Path(".aye/snapshots").resolve()
 
 
 # ------------------------------------------------------------------
@@ -82,13 +82,31 @@ def create_snapshot(file_paths: List[Path]) -> str:
     if not file_paths:
         raise ValueError("No files supplied for snapshot")
 
+    # Filter out files whose content hasn't changed
+    changed_files = []
+    for src_path in file_paths:
+        src_path = src_path.resolve()
+        if src_path.is_file():
+            current_content = src_path.read_text()
+            snapshot_content_path = src_path.parent / ".aye" / "snapshots" / "latest" / src_path.name
+            if snapshot_content_path.exists():
+                snapshot_content = snapshot_content_path.read_text()
+                if current_content == snapshot_content:
+                    continue  # Skip unchanged files
+            changed_files.append(src_path)
+        else:
+            changed_files.append(src_path)
+    
+    # If no files changed, return early
+    if not changed_files:
+        return ""
+
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
     batch_dir = _ensure_batch_dir(ts)
 
     meta_entries: List[Dict[str, Any]] = []
 
-    for src_path in file_paths:
-        src_path = src_path.resolve()
+    for src_path in changed_files:
         dest_path = batch_dir / src_path.name
 
         if src_path.is_file():
@@ -208,6 +226,10 @@ def apply_updates(updated_files: List[Dict[str, str]]) -> str:
 
     # ---- 2′′ Snapshot the *existing* state ----
     batch_ts = create_snapshot(file_paths)
+
+    # If no files changed, return early
+    if not batch_ts:
+        return ""
 
     # ---- 3′′ Overwrite with the new content ----
     for item in updated_files:
