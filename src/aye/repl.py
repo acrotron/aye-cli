@@ -104,8 +104,9 @@ def chat_repl(conf) -> None:
             summary = assistant_resp.get("answer_summary")
             rprint()
             color = "rgb(170,170,170)"
-            rprint(f"[{color}]    -{{•!•}}- »[/]")
-            console.print(Padding(summary, (0, 4, 0, 4)), style=color)
+            rprint(f"[{color}]-{{•!•}}- » {summary}[/]")
+            #rprint(f"[{color}]    -{{•!•}}- »[/]")
+            #console.print(Padding(summary, (0, 4, 0, 4)), style=color)
             rprint()
 
             updated_files = assistant_resp.get("source_files", [])
