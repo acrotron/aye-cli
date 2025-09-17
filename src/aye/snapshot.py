@@ -172,7 +172,7 @@ def restore_snapshot(timestamp: str | None = None) -> None:
         # Try with the full name if the above didn't work
         batch_dir = SNAP_ROOT / timestamp
         if not batch_dir.is_dir():
-            raise ValueError(f"No snapshot found for timestamp {timestamp}")
+            raise ValueError(f"Snapshot {timestamp} not found")
 
     meta_file = batch_dir / "metadata.json"
     if not meta_file.is_file():

@@ -1,8 +1,18 @@
 import subprocess
-from .snapshot import restore_snapshot, list_snapshots
+import re
 from rich import print as rprint
 from pathlib import Path
+from rich.console import Console
+from .snapshot import restore_snapshot, list_snapshots
 
+
+import re
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
+
+
+# Create a global console instance for diff output
+_diff_console = Console(force_terminal=True, markup=False, color_system="standard")
 
 def _is_valid_command(command: str) -> bool:
     """Check if a command exists in the system using bash's command -v"""
@@ -121,10 +131,13 @@ def diff_files(file1: Path, file2: Path) -> None:
             text=True
         )
         if result.stdout.strip():
-            rprint(result.stdout)
+            clean_output = ANSI_RE.sub("", result.stdout)
+            _diff_console.print(clean_output)
         else:
             rprint("[green]No differences found.[/]")
     except FileNotFoundError:
         rprint("[red]Error:[/] 'diff' command not found. Please install diffutils.")
     except Exception as e:
         rprint(f"[red]Error running diff:[/] {e}")
+
+
