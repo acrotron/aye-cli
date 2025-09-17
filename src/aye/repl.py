@@ -36,6 +36,7 @@ def chat_repl(conf) -> None:
 
     # Path to store chat_id persistently during session
     chat_id_file = Path(".aye/chat_id.tmp")
+    chat_id_file.parent.mkdir(parents=True, exist_ok=True)
     chat_id = None
 
     # Load chat_id if exists from previous session
