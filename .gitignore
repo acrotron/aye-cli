@@ -1,3 +1,6 @@
+# Custom
+*.swp
+
 # Secrets / credentials (never commit!)
 *.pem
 *.key
