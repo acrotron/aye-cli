@@ -24,10 +24,17 @@ load_config()
 
 app = typer.Typer(help="Aye: AI‑powered coding assistant for the terminal")
 
+# Create subcommands
+auth_app = typer.Typer(help="Authentication commands")
+snap_app = typer.Typer(help="Snapshot management commands")
+
+app.add_typer(auth_app, name="auth")
+app.add_typer(snap_app, name="snap")
+
 # ----------------------------------------------------------------------
 # Authentication commands
 # ----------------------------------------------------------------------
-@app.command()
+@auth_app.command()
 def login(
     url: str = typer.Option(
         "https://auth.example.com/cli-login",
@@ -39,19 +46,19 @@ def login(
     Configure username and token for authenticating with the aye service.
     
     Examples:
-    aye login
-    aye login --url https://my-auth-service.com/login
+    aye auth login
+    aye auth login --url https://my-auth-service.com/login
     """
     handle_login(url)
 
 
-@app.command()
+@auth_app.command()
 def logout():
     """
     Remove the stored aye credentials.
     
     Examples:
-    aye logout
+    aye auth logout
     """
     handle_logout()
 
@@ -105,24 +112,24 @@ def chat(
     handle_chat(root, file_mask)
 
 # ----------------------------------------------------------------------
-# Snapshot commands (moved from snap subcommand)
+# Snapshot commands
 # ----------------------------------------------------------------------
-@app.command("history")
-def history_cmd(
+@snap_app.command("history")
+def history(
     file: Path = typer.Argument(None, help="File to list snapshots for")
 ):
     """
     Show timestamps of saved snapshots for *file* or all snapshots if no file provided.
     
     Examples:
-    aye history
-    aye history src/main.py
+    aye snap history
+    aye snap history src/main.py
     """
     handle_history_cmd(file)
 
 
-@app.command("show")
-def snap_show_cmd(
+@snap_app.command("show")
+def show(
     file: Path = typer.Argument(..., help="File whose snapshot to show"),
     ts: str = typer.Argument(..., help="Timestamp of the snapshot"),
 ):
@@ -130,13 +137,13 @@ def snap_show_cmd(
     Print the contents of a specific snapshot.
     
     Examples:
-    aye show src/main.py 001
+    aye snap show src/main.py 001
     """
     handle_snap_show_cmd(file, ts)
 
 
-@app.command("restore")
-def restore_cmd(
+@snap_app.command("restore")
+def restore(
     ts: str = typer.Argument(None, help="Timestamp of the snapshot to restore (default: latest)"),
     file_name: str = typer.Argument(None, help="Specific file to restore from the snapshot"),
 ):
@@ -145,9 +152,9 @@ def restore_cmd(
     If file_name is provided, only that file is restored.
     
     Examples:
-    aye restore
-    aye restore 001
-    aye restore 001 myfile.py
+    aye snap restore
+    aye snap restore 001
+    aye snap restore 001 myfile.py
     """
     handle_restore_cmd(ts, file_name)
 
@@ -155,7 +162,7 @@ def restore_cmd(
 # ----------------------------------------------------------------------
 # Snapshot cleanup/pruning commands
 # ----------------------------------------------------------------------
-@app.command()
+@snap_app.command()
 def prune(
     keep: int = typer.Option(10, "--keep", "-k", help="Number of recent snapshots to keep (default: 10)"),
 ):
@@ -163,14 +170,14 @@ def prune(
     Delete all but the most recent N snapshots.
     
     Examples:
-    aye prune
-    aye prune --keep 5
-    aye prune -k 3
+    aye snap prune
+    aye snap prune --keep 5
+    aye snap prune -k 3
     """
     handle_prune_cmd(keep)
 
 
-@app.command()
+@snap_app.command()
 def cleanup(
     days: int = typer.Option(30, "--days", "-d", help="Delete snapshots older than N days (default: 30)"),
 ):
@@ -178,9 +185,9 @@ def cleanup(
     Delete snapshots older than N days.
     
     Examples:
-    aye cleanup
-    aye cleanup --days 7
-    aye cleanup -d 14
+    aye snap cleanup
+    aye snap cleanup --days 7
+    aye snap cleanup -d 14
     """
     handle_cleanup_cmd(days)
 
@@ -213,21 +220,21 @@ def config(
         handle_config_list()
     elif action == "get":
         if not key:
-            print("[red]Error:[/] Key is required for get action.")
+            typer.echo("[red]Error:[/] Key is required for get action.")
             raise typer.Exit(code=1)
         handle_config_get(key)
     elif action == "set":
         if not key or not value:
-            print("[red]Error:[/] Key and value are required for set action.")
+            typer.echo("[red]Error:[/] Key and value are required for set action.")
             raise typer.Exit(code=1)
         handle_config_set(key, value)
     elif action == "delete":
         if not key:
-            print("[red]Error:[/] Key is required for delete action.")
+            typer.echo("[red]Error:[/] Key is required for delete action.")
             raise typer.Exit(code=1)
         handle_config_delete(key)
     else:
-        print(f"[red]Error:[/] Invalid action '{action}'. Use: list, get, set, delete")
+        typer.echo(f"[red]Error:[/] Invalid action '{action}'. Use: list, get, set, delete")
         raise typer.Exit(code=1)
 
 
