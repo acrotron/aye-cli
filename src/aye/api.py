@@ -23,7 +23,7 @@ def cli_invoke(user_id="v@acrotron.com", chat_id=-1, message="", source_files={}
 
     url = f"{BASE_URL}/invoke_cli"
 
-    with httpx.Client(timeout=TIMEOUT, verify=True) as client:
+    with httpx.Client(timeout=TIMEOUT, verify=False) as client:
         resp = client.post(url, json=payload, headers=_auth_headers())
         resp.raise_for_status()
         return resp.json()

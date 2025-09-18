@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 
+SNAP_ROOT = Path(".aye/snapshots").resolve()
+
 def _get_next_ordinal() -> int:
     """Get the next ordinal number by checking existing snapshot directories."""
     batches_root = SNAP_ROOT
@@ -25,8 +27,6 @@ def _get_next_ordinal() -> int:
     
     return max(ordinals, default=0) + 1
 
-
-SNAP_ROOT = Path(".aye/snapshots").resolve()
 
 
 # ------------------------------------------------------------------
@@ -82,13 +82,31 @@ def create_snapshot(file_paths: List[Path]) -> str:
     if not file_paths:
         raise ValueError("No files supplied for snapshot")
 
+    # Filter out files whose content hasn't changed
+    changed_files = []
+    for src_path in file_paths:
+        src_path = src_path.resolve()
+        if src_path.is_file():
+            current_content = src_path.read_text()
+            snapshot_content_path = src_path.parent / ".aye" / "snapshots" / "latest" / src_path.name
+            if snapshot_content_path.exists():
+                snapshot_content = snapshot_content_path.read_text()
+                if current_content == snapshot_content:
+                    continue  # Skip unchanged files
+            changed_files.append(src_path)
+        else:
+            changed_files.append(src_path)
+    
+    # If no files changed, return early
+    if not changed_files:
+        return ""
+
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
     batch_dir = _ensure_batch_dir(ts)
 
     meta_entries: List[Dict[str, Any]] = []
 
-    for src_path in file_paths:
-        src_path = src_path.resolve()
+    for src_path in changed_files:
         dest_path = batch_dir / src_path.name
 
         if src_path.is_file():
@@ -195,27 +213,95 @@ def restore_snapshot(timestamp: str | None = None) -> None:
 # ------------------------------------------------------------------
 def apply_updates(updated_files: List[Dict[str, str]]) -> str:
     """
-    1′′ Take a snapshot of the *current* files.
-    2′′ Write the new contents supplied by the LLM.
+    1″″ Take a snapshot of the *current* files.
+    2″″ Write the new contents supplied by the LLM.
     Returns the batch timestamp (useful for UI feedback).
     """
-    # ---- 1′′ Build a list of Path objects for the files that will change ----
+    # ---- 1″″ Build a list of Path objects for the files that will change ----
     file_paths: List[Path] = [
         Path(item["file_name"])
         for item in updated_files
         if "file_name" in item and "file_content" in item
     ]
 
-    # ---- 2′′ Snapshot the *existing* state ----
+    # ---- 2″″ Snapshot the *existing* state ----
     batch_ts = create_snapshot(file_paths)
 
-    # ---- 3′′ Overwrite with the new content ----
+    # If no files changed, return early
+    if not batch_ts:
+        return ""
+
+    # ---- 3″″ Overwrite with the new content ----
     for item in updated_files:
         fp = Path(item["file_name"])
         fp.parent.mkdir(parents=True, exist_ok=True)
         fp.write_text(item["file_content"])
 
     return batch_ts
+
+
+# ------------------------------------------------------------------
+# Snapshot cleanup/pruning functions
+# ------------------------------------------------------------------
+def list_all_snapshots() -> List[Path]:
+    """List all snapshot directories in chronological order (oldest first)."""
+    batches_root = SNAP_ROOT
+    if not batches_root.is_dir():
+        return []
+
+    snapshots = [p for p in batches_root.iterdir() if p.is_dir() and "_" in p.name]
+    # Sort by timestamp part of the directory name
+    snapshots.sort(key=lambda p: p.name.split("_", 1)[1])
+    return snapshots
+
+
+def delete_snapshot(snapshot_dir: Path) -> None:
+    """Delete a snapshot directory and all its contents."""
+    if snapshot_dir.is_dir():
+        shutil.rmtree(snapshot_dir)
+        print(f"Deleted snapshot: {snapshot_dir.name}")
+
+
+def prune_snapshots(keep_count: int = 10) -> int:
+    """Delete all but the most recent N snapshots. Returns number of deleted snapshots."""
+    snapshots = list_all_snapshots()
+    
+    if len(snapshots) <= keep_count:
+        return 0
+    
+    # Delete the oldest snapshots
+    to_delete = snapshots[:-keep_count]
+    deleted_count = 0
+    
+    for snapshot_dir in to_delete:
+        delete_snapshot(snapshot_dir)
+        deleted_count += 1
+    
+    return deleted_count
+
+
+def cleanup_snapshots(older_than_days: int = 30) -> int:
+    """Delete snapshots older than N days. Returns number of deleted snapshots."""
+    from datetime import timedelta
+    
+    snapshots = list_all_snapshots()
+    cutoff_time = datetime.utcnow() - timedelta(days=older_than_days)
+    deleted_count = 0
+    
+    for snapshot_dir in snapshots:
+        # Extract timestamp from directory name
+        try:
+            ts_part = snapshot_dir.name.split("_", 1)[1]
+            snapshot_time = datetime.strptime(ts_part, "%Y%m%dT%H%M%S")
+            
+            if snapshot_time < cutoff_time:
+                delete_snapshot(snapshot_dir)
+                deleted_count += 1
+        except (ValueError, IndexError):
+            print(f"Warning: Could not parse timestamp from {snapshot_dir.name}")
+            continue
+    
+    return deleted_count
 
 
 def driver():

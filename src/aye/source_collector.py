@@ -2,8 +2,16 @@ from pathlib import Path
 from typing import Dict, Any, Set
 
 
+def _is_hidden(path: Path) -> bool:
+    """Return True if *path* or any of its ancestors is a hidden directory.
+
+    Hidden directories are those whose name starts with a dot (".").
+    """
+    return any(part.startswith(".") for part in path.parts)
+
+
 def collect_sources(
-    root_dir: str = "aye",
+    root_dir: str = ".",
     file_mask: str = "*.py",
     recursive: bool = True,
 ) -> Dict[str, str]:
@@ -17,6 +25,9 @@ def collect_sources(
     iterator = base_path.rglob(file_mask) if recursive else base_path.glob(file_mask)
 
     for py_file in iterator:
+        # Skip hidden subfolders (any part of the path starting with '.')
+        if _is_hidden(py_file.relative_to(base_path)):
+            continue
         if not py_file.is_file():
             continue
         try:
@@ -47,5 +58,3 @@ def driver():
 
 if __name__ == "__main__":
     driver()
-
-

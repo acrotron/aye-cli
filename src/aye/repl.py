@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -12,30 +11,44 @@ from prompt_toolkit.completion import PathCompleter
 from .completers import CmdPathCompleter
 from prompt_toolkit.shortcuts import CompleteStyle
 
-from rich import print as rprint
-from rich.text import Text
-from rich.padding import Padding
 from rich.console import Console
-from rich.spinner import Spinner
 
-from .api import cli_invoke
+from .service import (
+    _is_valid_command,
+    handle_restore_command,
+    handle_history_command,
+    handle_shell_command,
+    handle_diff_command,
+    process_chat_message,
+    filter_unchanged_files
+)
+
+from .ui import (
+    print_welcome_message,
+    print_prompt,
+    print_thinking_spinner,
+    print_assistant_response,
+    print_no_files_changed,
+    print_files_updated,
+    print_error 
+)
+
 from .snapshot import apply_updates
-from .source_collector import collect_sources
-from .command import handle_restore_command, handle_history_command, handle_shell_command, _is_valid_command, handle_diff_command
 
 
 def chat_repl(conf) -> None:
     session = PromptSession(
         history=InMemoryHistory(),
         completer=CmdPathCompleter(),
-        complete_style=CompleteStyle.READLINE_LIKE,   # “readline” style, no menu
+        complete_style=CompleteStyle.READLINE_LIKE,   # "readline" style, no menu
         complete_while_typing=False)
 
-    rprint("[bold cyan]Aye CLI – type /exit or Ctrl‑D to quit[/]")
+    print_welcome_message()
     console = Console()
 
     # Path to store chat_id persistently during session
     chat_id_file = Path(".aye/chat_id.tmp")
+    chat_id_file.parent.mkdir(parents=True, exist_ok=True)
     chat_id = None
 
     # Load chat_id if exists from previous session
@@ -47,7 +60,7 @@ def chat_repl(conf) -> None:
 
     while True:
         try:
-            prompt = session.prompt("(ツ » ")
+            prompt = session.prompt(print_prompt())
         except (EOFError, KeyboardInterrupt):
             break
 
@@ -68,7 +81,7 @@ def chat_repl(conf) -> None:
             continue
 
         # Check for restore commands
-        if first_token in {"/restore", "restore"}:
+        if first_token in {"/restore", "/revert", "restore", "revert"}:
             handle_restore_command(None)
             continue
 
@@ -84,35 +97,33 @@ def chat_repl(conf) -> None:
             handle_shell_command(command, args)
             continue
 
-        spinner = Spinner("dots", text="[yellow]Thinking...[/]")
+        spinner = print_thinking_spinner(console)
         
         try:
             with console.status(spinner) as status:
-                source_files = collect_sources(conf.root, conf.file_mask)
-                resp = cli_invoke(message=prompt, chat_id=chat_id or -1, source_files=source_files)
+                result = process_chat_message(prompt, chat_id, conf.root, conf.file_mask)
             
             # Extract and store new chat_id from response
-            new_chat_id = resp.get("chat_id")
+            new_chat_id = result["new_chat_id"]
             if new_chat_id is not None:
                 chat_id = new_chat_id
                 chat_id_file.write_text(str(chat_id))
             
-            assistant_resp_str = resp.get('assistant_response')
-            assistant_resp = json.loads(assistant_resp_str)
+            summary = result["summary"]
+            print_assistant_response(summary)
 
-            summary = assistant_resp.get("answer_summary")
-            rprint()
-            color = "rgb(170,170,170)"
-            rprint(f"[{color}]    -{{•!•}}- »[/]")
-            console.print(Padding(summary, (0, 4, 0, 4)), style=color)
-            rprint()
-
-            updated_files = assistant_resp.get("source_files", [])
-            if updated_files:
+            updated_files = result["updated_files"]
+            
+            # Filter unchanged files
+            updated_files = filter_unchanged_files(updated_files)
+            
+            if not updated_files:
+                print_no_files_changed(console)
+            elif updated_files:
                 batch_ts = apply_updates(updated_files)
                 file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
                 if file_names:
-                    console.print(Padding(f"[green]Files updated:[/] {','.join(file_names)}", (0, 4, 0, 4)))
+                    print_files_updated(console, file_names)
         except Exception as exc:
-            rprint(f"[red]Error:[/] {exc}")
+            print_error(exc)
             continue
