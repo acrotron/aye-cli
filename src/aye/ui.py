@@ -12,7 +12,7 @@ def print_welcome_message():
 
 def print_prompt():
     """Display the prompt symbol for user input."""
-    return "(ツ » "
+    return "(ツ» "
 
 
 def print_thinking_spinner(console: Console) -> Spinner:
@@ -24,7 +24,7 @@ def print_assistant_response(summary: str):
     """Display the assistant's response summary."""
     rprint()
     color = "rgb(170,170,170)"
-    bot_face = "-{•_•}-"
+    bot_face = "-{•!•}-"
     rprint(f"[{color}]{bot_face} » {summary}[/]")
     rprint()
 

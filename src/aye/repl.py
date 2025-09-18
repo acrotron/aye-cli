@@ -12,6 +12,7 @@ from .completers import CmdPathCompleter
 from prompt_toolkit.shortcuts import CompleteStyle
 
 from rich.console import Console
+from rich.live import Live
 
 from .service import (
     _is_valid_command,
@@ -90,7 +91,8 @@ def chat_repl(conf) -> None:
             handle_shell_command(command, args)
             continue
 
+        # Create and display spinner
         spinner = print_thinking_spinner(console)
-        
-        # Process the message using the new service function
-        process_repl_message(prompt, chat_id, conf.root, conf.file_mask, chat_id_file, console)
+        with Live(spinner, console=console, refresh_per_second=10, transient=True):
+            # Process the message using the new service function
+            process_repl_message(prompt, chat_id, conf.root, conf.file_mask, chat_id_file, console)
