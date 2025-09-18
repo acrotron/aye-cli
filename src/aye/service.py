@@ -9,8 +9,14 @@ from typing import Optional, List, Dict
 
 from .api import cli_invoke
 from .source_collector import collect_sources
-from .snapshot import restore_snapshot, list_snapshots, create_snapshot
+from .snapshot import restore_snapshot, list_snapshots, create_snapshot, apply_updates
 from .config import get_value, set_value, delete_value, list_config
+from .ui import (
+    print_assistant_response,
+    print_no_files_changed,
+    print_files_updated,
+    print_error
+)
 
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
@@ -34,22 +40,13 @@ def handle_logout() -> None:
 
 
 # One-shot generation function
-def handle_generate_cmd(prompt: str, file: Optional[Path], mode: str) -> None:
+def handle_generate_cmd(prompt: str) -> None:
     """
-    Send a single prompt to the backend.  If `file` is supplied,
-    the file is snapshotted first, then overwritten/appended.
+    Send a single prompt to the backend.
     """
-    if file:
-        create_snapshot([file])          # ← undo point
-
-    resp = cli_invoke(message=prompt, filename=str(file) if file else None, mode=mode)
+    resp = cli_invoke(message=prompt)
     code = resp.get("generated_code", "")
-
-    if file:
-        file.write_text(code)
-        rprint(f"\u2705 {file} updated (snapshot taken)")
-    else:
-        rprint(code)
+    rprint(code)
 
 
 # Chat function
@@ -65,6 +62,38 @@ def handle_chat(root: Path, file_mask: str) -> None:
     conf.root = root
     conf.file_mask = file_mask
     chat_repl(conf)
+
+
+def process_repl_message(prompt: str, chat_id: Optional[int], root: Path, file_mask: str, chat_id_file: Path, console: Console) -> None:
+    """Process a REPL message and handle the response."""
+    from . import service
+    
+    try:
+        result = service.process_chat_message(prompt, chat_id, root, file_mask)
+        
+        # Extract and store new chat_id from response
+        new_chat_id = result["new_chat_id"]
+        if new_chat_id is not None:
+            chat_id = new_chat_id
+            chat_id_file.write_text(str(chat_id))
+        
+        summary = result["summary"]
+        print_assistant_response(summary)
+
+        updated_files = result["updated_files"]
+        
+        # Filter unchanged files
+        updated_files = service.filter_unchanged_files(updated_files)
+        
+        if not updated_files:
+            print_no_files_changed(console)
+        elif updated_files:
+            batch_ts = apply_updates(updated_files)
+            file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
+            if file_names:
+                print_files_updated(console, file_names)
+    except Exception as exc:
+        print_error(exc)
 
 
 # Snapshot functions

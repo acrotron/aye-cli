@@ -68,9 +68,6 @@ def logout():
 @app.command()
 def generate(
     prompt: str = typer.Argument(..., help="Prompt for the LLM"),
-    file: Path = typer.Option(
-        None, "--file", "-f", help="Path to the file to be modified"
-    ),
     mode: str = typer.Option(
         "replace",
         "--mode",
@@ -79,15 +76,13 @@ def generate(
     ),
 ):
     """
-    Send a single prompt to the backend.  If `--file` is supplied,
-    the file is snapshotted first, then overwritten/appended.
+    Send a single prompt to the backend.
     
     Examples:
     aye generate "Create a function that reverses a string"
-    aye generate "Add type hints to this function" --file src/utils.py
-    aye generate "Add a docstring to this class" --file src/models.py --mode append
+    aye generate "Add type hints to this function" --mode append
     """
-    handle_generate_cmd(prompt, file, mode)
+    handle_generate_cmd(prompt, mode)
 
 # ----------------------------------------------------------------------
 # Interactive REPL (chat) command
