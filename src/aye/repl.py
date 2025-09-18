@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -14,10 +13,16 @@ from prompt_toolkit.shortcuts import CompleteStyle
 
 from rich.console import Console
 
-from .api import cli_invoke
-from .snapshot import apply_updates
-from .source_collector import collect_sources
-from .command import handle_restore_command, handle_history_command, handle_shell_command, _is_valid_command, handle_diff_command
+from .service import (
+    _is_valid_command,
+    handle_restore_command,
+    handle_history_command,
+    handle_shell_command,
+    handle_diff_command,
+    process_chat_message,
+    filter_unchanged_files
+)
+
 from .ui import (
     print_welcome_message,
     print_prompt,
@@ -25,39 +30,17 @@ from .ui import (
     print_assistant_response,
     print_no_files_changed,
     print_files_updated,
-    print_error
+    print_error 
 )
 
-
-def filter_unchanged_files(updated_files: list) -> list:
-    """Filter out files from updated_files list if their content hasn't changed compared to on-disk version."""
-    changed_files = []
-    for item in updated_files:
-        file_path = Path(item["file_name"])
-        new_content = item["file_content"]
-        
-        # If file doesn't exist on disk, consider it changed (new file)
-        if not file_path.exists():
-            changed_files.append(item)
-            continue
-            
-        # Read current content and compare
-        try:
-            current_content = file_path.read_text()
-            if current_content != new_content:
-                changed_files.append(item)
-        except Exception:
-            # If we can't read the file, assume it should be updated
-            changed_files.append(item)
-            
-    return changed_files
+from .snapshot import apply_updates
 
 
 def chat_repl(conf) -> None:
     session = PromptSession(
         history=InMemoryHistory(),
         completer=CmdPathCompleter(),
-        complete_style=CompleteStyle.READLINE_LIKE,   # “readline” style, no menu
+        complete_style=CompleteStyle.READLINE_LIKE,   # "readline" style, no menu
         complete_while_typing=False)
 
     print_welcome_message()
@@ -118,26 +101,18 @@ def chat_repl(conf) -> None:
         
         try:
             with console.status(spinner) as status:
-                source_files = collect_sources(conf.root, conf.file_mask)
-
-                for k in source_files.keys():
-                    print(k)
-
-                resp = cli_invoke(message=prompt, chat_id=chat_id or -1, source_files=source_files)
+                result = process_chat_message(prompt, chat_id, conf.root, conf.file_mask)
             
             # Extract and store new chat_id from response
-            new_chat_id = resp.get("chat_id")
+            new_chat_id = result["new_chat_id"]
             if new_chat_id is not None:
                 chat_id = new_chat_id
                 chat_id_file.write_text(str(chat_id))
             
-            assistant_resp_str = resp.get('assistant_response')
-            assistant_resp = json.loads(assistant_resp_str)
-
-            summary = assistant_resp.get("answer_summary")
+            summary = result["summary"]
             print_assistant_response(summary)
 
-            updated_files = assistant_resp.get("source_files", [])
+            updated_files = result["updated_files"]
             
             # Filter unchanged files
             updated_files = filter_unchanged_files(updated_files)
@@ -149,7 +124,6 @@ def chat_repl(conf) -> None:
                 file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
                 if file_names:
                     print_files_updated(console, file_names)
-            rprint()
         except Exception as exc:
             print_error(exc)
             continue

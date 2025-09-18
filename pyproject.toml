@@ -1,6 +1,6 @@
 [project]
 name = "aye-cli"                     # the name that will appear on PyPI
-version = "0.1.3"
+version = "0.1.4"
 description = "Aye: AI‑powered coding assistant for the terminal"
 readme = "README.md"
 requires-python = ">=3.8"

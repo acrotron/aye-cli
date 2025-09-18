@@ -2,6 +2,7 @@ from rich import print as rprint
 from rich.padding import Padding
 from rich.console import Console
 from rich.spinner import Spinner
+from rich import print as rprint
 
 
 def print_welcome_message():
@@ -30,7 +31,7 @@ def print_assistant_response(summary: str):
 
 def print_no_files_changed(console: Console):
     """Display message when no files were changed."""
-    console.print(Padding("[yellow]No files were changed.[/", (0, 4, 0, 4)))
+    console.print(Padding("[yellow]No files were changed.[/]", (0, 4, 0, 4)))
 
 
 def print_files_updated(console: Console, file_names: list):
