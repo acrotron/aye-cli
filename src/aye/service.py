@@ -87,14 +87,20 @@ def handle_snap_show_cmd(file: Path, ts: str) -> None:
     rprint("Snapshot not found.", err=True)
 
 
-def handle_restore_cmd(ts: Optional[str]) -> None:
+def handle_restore_cmd(ts: Optional[str], file_name: Optional[str] = None) -> None:
     """Replace all files with the latest snapshot or specified snapshot."""
     try:
-        restore_snapshot(ts)
+        restore_snapshot(ts, file_name)
         if ts:
-            rprint(f"\u2705 All files restored to {ts}")
+            if file_name:
+                rprint(f"\u2705 File '{file_name}' restored to {ts}")
+            else:
+                rprint(f"\u2705 All files restored to {ts}")
         else:
-            rprint(f"\u2705 All files restored to latest snapshot")
+            if file_name:
+                rprint(f"\u2705 File '{file_name}' restored to latest snapshot")
+            else:
+                rprint(f"\u2705 All files restored to latest snapshot")
     except Exception as exc:
         rprint(f"Error: {exc}", err=True)
 
@@ -111,14 +117,20 @@ def _is_valid_command(command: str) -> bool:
         return False
 
 
-def handle_restore_command(timestamp: str | None = None) -> None:
+def handle_restore_command(timestamp: str | None = None, file_name: str | None = None) -> None:
     """Handle the restore command logic.""" 
     try:
-        restore_snapshot(timestamp)
+        restore_snapshot(timestamp, file_name)
         if timestamp:
-            rprint(f"[green]All files restored to {timestamp}[/]")
+            if file_name:
+                rprint(f"[green]File '{file_name}' restored to {timestamp}[/]")
+            else:
+                rprint(f"[green]All files restored to {timestamp}[/]")
         else:
-            rprint("[green]All files restored to latest snapshot.[/]")
+            if file_name:
+                rprint(f"[green]File '{file_name}' restored to latest snapshot.[/]")
+            else:
+                rprint("[green]All files restored to latest snapshot.[/]")
     except Exception as e:
         rprint(f"[red]Error restoring snapshot:[/] {e}")
 

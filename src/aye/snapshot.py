@@ -146,10 +146,11 @@ def list_snapshots(file: Path | None = None) -> List[str]:
     return snapshots
 
 
-def restore_snapshot(timestamp: str | None = None) -> None:
+def restore_snapshot(timestamp: str | None = None, file_name: str | None = None) -> None:
     """
     Restore *all* files from a batch snapshot.
     If ``timestamp`` is omitted the most recent snapshot is used.
+    If ``file_name`` is provided, only that file is restored.
     """
     if timestamp is None:
         timestamps = list_snapshots()
@@ -197,6 +198,15 @@ def restore_snapshot(timestamp: str | None = None) -> None:
         raise ValueError(f"Metadata missing for snapshot {timestamp}")
 
     meta = json.loads(meta_file.read_text())
+
+    # If file_name is specified, filter the entries
+    if file_name is not None:
+        meta["files"] = [
+            entry for entry in meta["files"]
+            if Path(entry["original"]).name == file_name
+        ]
+        if not meta["files"]:
+            raise ValueError(f"File '{file_name}' not found in snapshot {timestamp}")
 
     for entry in meta["files"]:
         original = Path(entry["original"])

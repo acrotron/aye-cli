@@ -130,7 +130,6 @@ def snap_show_cmd(
     Print the contents of a specific snapshot.
     
     Examples:
-    aye show src/main.py 001_20250916T214101
     aye show src/main.py 001
     """
     handle_snap_show_cmd(file, ts)
@@ -139,16 +138,18 @@ def snap_show_cmd(
 @app.command("restore")
 def restore_cmd(
     ts: str = typer.Argument(None, help="Timestamp of the snapshot to restore (default: latest)"),
+    file_name: str = typer.Argument(None, help="Specific file to restore from the snapshot"),
 ):
     """
     Replace all files with the latest snapshot or specified snapshot.
+    If file_name is provided, only that file is restored.
     
     Examples:
     aye restore
-    aye restore 001_20250916T214101
     aye restore 001
+    aye restore 001 myfile.py
     """
-    handle_restore_cmd(ts)
+    handle_restore_cmd(ts, file_name)
 
 
 # ----------------------------------------------------------------------
