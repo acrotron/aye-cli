@@ -126,7 +126,7 @@ def history(
 @snap_app.command("show")
 def show(
     file: Path = typer.Argument(..., help="File whose snapshot to show"),
-    ts: str = typer.Argument(..., help="Timestamp of the snapshot"),
+    ordinal: str = typer.Argument(..., help="Ordinal of the snapshot (e.g., 001)"),
 ):
     """
     Print the contents of a specific snapshot.
@@ -134,16 +134,16 @@ def show(
     Examples:
     aye snap show src/main.py 001
     """
-    handle_snap_show_cmd(file, ts)
+    handle_snap_show_cmd(file, ordinal)
 
 
 @snap_app.command("restore")
 def restore(
-    ts: str = typer.Argument(None, help="Timestamp of the snapshot to restore (default: latest)"),
+    ordinal: str = typer.Argument(None, help="Ordinal of the snapshot to restore (e.g., 001, default: latest)"),
     file_name: str = typer.Argument(None, help="Specific file to restore from the snapshot"),
 ):
     """
-    Replace all files with the latest snapshot or specified snapshot.
+    Replace all files with the latest snapshot or specified snapshot by ordinal.
     If file_name is provided, only that file is restored.
     
     Examples:
@@ -151,7 +151,7 @@ def restore(
     aye snap restore 001
     aye snap restore 001 myfile.py
     """
-    handle_restore_cmd(ts, file_name)
+    handle_restore_cmd(ordinal, file_name)
 
 
 # ----------------------------------------------------------------------

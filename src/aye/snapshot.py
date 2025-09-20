@@ -9,6 +9,8 @@ from typing import List, Dict, Any
 
 
 SNAP_ROOT = Path(".aye/snapshots").resolve()
+LATEST_SNAP_DIR = SNAP_ROOT / "latest"
+
 
 def _get_next_ordinal() -> int:
     """Get the next ordinal number by checking existing snapshot directories."""
@@ -18,7 +20,7 @@ def _get_next_ordinal() -> int:
     
     ordinals = []
     for batch_dir in batches_root.iterdir():
-        if batch_dir.is_dir() and "_" in batch_dir.name:
+        if batch_dir.is_dir() and "_" in batch_dir.name and batch_dir.name != "latest":
             try:
                 ordinal = int(batch_dir.name.split("_")[0])
                 ordinals.append(ordinal)
@@ -27,6 +29,28 @@ def _get_next_ordinal() -> int:
     
     return max(ordinals, default=0) + 1
 
+
+def _get_latest_snapshot_dir() -> Path | None:
+    """Get the latest snapshot directory by finding the one with the highest ordinal."""
+    batches_root = SNAP_ROOT
+    if not batches_root.is_dir():
+        return None
+    
+    snapshot_dirs = []
+    for batch_dir in batches_root.iterdir():
+        if batch_dir.is_dir() and "_" in batch_dir.name and batch_dir.name != "latest":
+            try:
+                ordinal = int(batch_dir.name.split("_")[0])
+                snapshot_dirs.append((ordinal, batch_dir))
+            except ValueError:
+                continue
+    
+    if not snapshot_dirs:
+        return None
+    
+    # Sort by ordinal and return the directory with the highest ordinal
+    snapshot_dirs.sort(key=lambda x: x[0])
+    return snapshot_dirs[-1][1]
 
 
 # ------------------------------------------------------------------
@@ -48,7 +72,7 @@ def _list_all_snapshots_with_metadata():
     if not batches_root.is_dir():
         return []
 
-    timestamps = [p.name for p in batches_root.iterdir() if p.is_dir()]
+    timestamps = [p.name for p in batches_root.iterdir() if p.is_dir() and p.name != "latest"]
     timestamps.sort(reverse=True)
     result = []
     for ts in timestamps:
@@ -84,15 +108,19 @@ def create_snapshot(file_paths: List[Path]) -> str:
 
     # Filter out files whose content hasn't changed
     changed_files = []
+    latest_snap_dir = _get_latest_snapshot_dir()
+    
     for src_path in file_paths:
         src_path = src_path.resolve()
         if src_path.is_file():
             current_content = src_path.read_text()
-            snapshot_content_path = src_path.parent / ".aye" / "snapshots" / "latest" / src_path.name
-            if snapshot_content_path.exists():
-                snapshot_content = snapshot_content_path.read_text()
-                if current_content == snapshot_content:
-                    continue  # Skip unchanged files
+            # If there's no latest snapshot, all files are considered changed
+            if latest_snap_dir is not None:
+                snapshot_content_path = latest_snap_dir / src_path.name
+                if snapshot_content_path.exists():
+                    snapshot_content = snapshot_content_path.read_text()
+                    if current_content == snapshot_content:
+                        continue  # Skip unchanged files
             changed_files.append(src_path)
         else:
             changed_files.append(src_path)
@@ -121,6 +149,20 @@ def create_snapshot(file_paths: List[Path]) -> str:
     meta = {"timestamp": ts, "files": meta_entries}
     (batch_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
 
+    # Update the latest snapshot directory
+    # First, remove the existing latest directory if it exists
+    if LATEST_SNAP_DIR.exists():
+        shutil.rmtree(LATEST_SNAP_DIR)
+    
+    # Create a new latest directory and copy all files from the current batch
+    LATEST_SNAP_DIR.mkdir(parents=True, exist_ok=True)
+    for src_path in changed_files:
+        dest_path = LATEST_SNAP_DIR / src_path.name
+        if src_path.is_file():
+            shutil.copy2(src_path, dest_path)
+        else:
+            dest_path.write_text("")
+
     return batch_dir.name
 
 
@@ -135,7 +177,7 @@ def list_snapshots(file: Path | None = None) -> List[str]:
 
     snapshots = []
     for batch_dir in batches_root.iterdir():
-        if batch_dir.is_dir():
+        if batch_dir.is_dir() and batch_dir.name != "latest":
             meta_path = batch_dir / "metadata.json"
             if meta_path.exists():
                 meta = json.loads(meta_path.read_text())
@@ -146,76 +188,71 @@ def list_snapshots(file: Path | None = None) -> List[str]:
     return snapshots
 
 
-def restore_snapshot(timestamp: str | None = None, file_name: str | None = None) -> None:
+def restore_snapshot(ordinal: str | None = None, file_name: str | None = None) -> None:
     """
-    Restore *all* files from a batch snapshot.
-    If ``timestamp`` is omitted the most recent snapshot is used.
+    Restore *all* files from a batch snapshot identified by ordinal number.
+    If ``ordinal`` is omitted the most recent snapshot is used.
     If ``file_name`` is provided, only that file is restored.
     """
-    if timestamp is None:
+    if ordinal is None:
         timestamps = list_snapshots()
         if not timestamps:
             raise ValueError("No snapshots found")
-        timestamp = timestamps[0].split()[0] if timestamps else None
-        if not timestamp:
+        # Extract ordinal from the first (most recent) snapshot
+        ordinal = timestamps[0].split()[0].split("(")[0] if timestamps else None
+        if not ordinal:
             raise ValueError("No snapshots found")
 
-    # Handle both ordinal-only and full formatted timestamp inputs
-    actual_timestamp = None
+    # Find the correct snapshot directory by ordinal only
+    batch_dir = None
     
-    # Check if input is just the ordinal (e.g., "001")
-    if timestamp.isdigit() and len(timestamp) == 3:
-        # Find the snapshot directory that starts with this ordinal
-        for batch_dir in SNAP_ROOT.iterdir():
-            if batch_dir.is_dir() and batch_dir.name.startswith(f"{timestamp}_"):
-                actual_timestamp = timestamp
-                timestamp = batch_dir.name
+    # Handle ordinal-only input (e.g., "001")
+    if ordinal.isdigit() and len(ordinal) == 3:
+        for dir_path in SNAP_ROOT.iterdir():
+            if dir_path.is_dir() and dir_path.name.startswith(f"{ordinal}_"):
+                batch_dir = dir_path
                 break
     
-    # If we have a full directory name or extracted it from ordinal
-    if "_" in timestamp:
-        # Extract actual timestamp from formatted version
-        parts = timestamp.split("_", 1)
-        if len(parts) == 2:
-            actual_timestamp = parts[1]  # The actual timestamp part
-    elif "(" in timestamp and ")" in timestamp:
-        # Handle the formatted timestamp (e.g., "001 (20250916T214101)")
-        actual_timestamp = timestamp.split("(")[1].split(")")[0]
-    
-    # If we couldn't extract actual timestamp, try using input directly
-    if actual_timestamp is None:
-        actual_timestamp = timestamp
-
-    batch_dir = SNAP_ROOT / timestamp
-    if not batch_dir.is_dir():
-        # Try with the full name if the above didn't work
-        batch_dir = SNAP_ROOT / timestamp
-        if not batch_dir.is_dir():
-            raise ValueError(f"Snapshot {timestamp} not found")
+    if batch_dir is None:
+        raise ValueError(f"Snapshot with ordinal {ordinal} not found")
 
     meta_file = batch_dir / "metadata.json"
     if not meta_file.is_file():
-        raise ValueError(f"Metadata missing for snapshot {timestamp}")
+        raise ValueError(f"Metadata missing for snapshot {ordinal}")
 
-    meta = json.loads(meta_file.read_text())
+    try:
+        meta = json.loads(meta_file.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid metadata for snapshot {ordinal}: {e}")
 
     # If file_name is specified, filter the entries
     if file_name is not None:
-        meta["files"] = [
+        filtered_entries = [
             entry for entry in meta["files"]
             if Path(entry["original"]).name == file_name
         ]
-        if not meta["files"]:
-            raise ValueError(f"File '{file_name}' not found in snapshot {timestamp}")
+        if not filtered_entries:
+            raise ValueError(f"File '{file_name}' not found in snapshot {ordinal}")
+        meta["files"] = filtered_entries
 
+    # Restore files
     for entry in meta["files"]:
-        original = Path(entry["original"])
-        snapshot = Path(entry["snapshot"])
-        if not snapshot.is_file():
-            print(f"Warning: snapshot missing – {snapshot}")
+        original = Path(entry["original"])  # Path to restore to
+        snapshot_path = Path(entry["snapshot"])  # Path in snapshot directory
+        
+        # Check if snapshot file exists
+        if not snapshot_path.exists():
+            print(f"Warning: snapshot file missing – {snapshot_path}")
             continue
-        original.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(snapshot, original)
+            
+        try:
+            # Ensure parent directory exists
+            original.parent.mkdir(parents=True, exist_ok=True)
+            # Copy snapshot file to original location
+            shutil.copy2(snapshot_path, original)
+        except Exception as e:
+            print(f"Warning: failed to restore {original}: {e}")
+            continue
 
 
 # ------------------------------------------------------------------
@@ -259,7 +296,7 @@ def list_all_snapshots() -> List[Path]:
     if not batches_root.is_dir():
         return []
 
-    snapshots = [p for p in batches_root.iterdir() if p.is_dir() and "_" in p.name]
+    snapshots = [p for p in batches_root.iterdir() if p.is_dir() and "_" in p.name and p.name != "latest"]
     # Sort by timestamp part of the directory name
     snapshots.sort(key=lambda p: p.name.split("_", 1)[1])
     return snapshots
