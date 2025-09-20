@@ -66,34 +66,9 @@ def handle_chat(root: Path, file_mask: str) -> None:
 
 def process_repl_message(prompt: str, chat_id: Optional[int], root: Path, file_mask: str, chat_id_file: Path, console: Console) -> None:
     """Process a REPL message and handle the response."""
-    from . import service
-    
-    try:
-        result = service.process_chat_message(prompt, chat_id, root, file_mask)
-        
-        # Extract and store new chat_id from response
-        new_chat_id = result["new_chat_id"]
-        if new_chat_id is not None:
-            chat_id = new_chat_id
-            chat_id_file.write_text(str(chat_id))
-        
-        summary = result["summary"]
-        print_assistant_response(summary)
-
-        updated_files = result["updated_files"]
-        
-        # Filter unchanged files
-        updated_files = service.filter_unchanged_files(updated_files)
-        
-        if not updated_files:
-            print_no_files_changed(console)
-        elif updated_files:
-            batch_ts = apply_updates(updated_files)
-            file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
-            if file_names:
-                print_files_updated(console, file_names)
-    except Exception as exc:
-        print_error(exc)
+    # This function is now deprecated and should not be used
+    # The processing logic has been moved to repl.py to fix the spinner issue
+    pass
 
 
 # Snapshot functions

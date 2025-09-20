@@ -20,14 +20,19 @@ from .service import (
     handle_history_command,
     handle_shell_command,
     handle_diff_command,
-    process_repl_message
+    process_chat_message,
+    filter_unchanged_files
 )
 
 from .ui import (
     print_welcome_message,
     print_prompt,
-    print_thinking_spinner
+    print_thinking_spinner,
+    print_assistant_response,
+    print_no_files_changed,
+    print_files_updated
 )
+from .snapshot import apply_updates
 
 
 def chat_repl(conf) -> None:
@@ -96,5 +101,33 @@ def chat_repl(conf) -> None:
         # Create and display spinner
         spinner = print_thinking_spinner(console)
         with Live(spinner, console=console, refresh_per_second=10, transient=True):
-            # Process the message using the new service function
-            process_repl_message(prompt, chat_id, conf.root, conf.file_mask, chat_id_file, console)
+            # Process the message and get results
+            try:
+                result = process_chat_message(prompt, chat_id, conf.root, conf.file_mask)
+            except Exception as exc:
+                from .ui import print_error
+                print_error(exc)
+                continue
+        
+        # Extract and store new chat_id from response
+        new_chat_id = result["new_chat_id"]
+        if new_chat_id is not None:
+            chat_id = new_chat_id
+            chat_id_file.write_text(str(chat_id))
+        
+        # Print results after the Live context manager has exited
+        summary = result["summary"]
+        print_assistant_response(summary)
+
+        updated_files = result["updated_files"]
+        
+        # Filter unchanged files
+        updated_files = filter_unchanged_files(updated_files)
+        
+        if not updated_files:
+            print_no_files_changed(console)
+        elif updated_files:
+            batch_ts = apply_updates(updated_files)
+            file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
+            if file_names:
+                print_files_updated(console, file_names)
