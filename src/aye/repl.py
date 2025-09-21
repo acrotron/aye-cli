@@ -13,6 +13,8 @@ from prompt_toolkit.shortcuts import CompleteStyle
 
 from rich.console import Console
 from rich.live import Live
+from rich.spinner import Spinner
+from rich.text import Text
 
 from .service import (
     _is_valid_command,
@@ -27,12 +29,16 @@ from .service import (
 from .ui import (
     print_welcome_message,
     print_prompt,
-    print_thinking_spinner,
     print_assistant_response,
     print_no_files_changed,
     print_files_updated
 )
 from .snapshot import apply_updates
+
+
+def print_thinking_spinner() -> Spinner:
+    """Create and return a single thinking spinner."""
+    return Spinner("dots", text="[yellow]Thinking...[/]")
 
 
 def chat_repl(conf) -> None:
@@ -99,8 +105,8 @@ def chat_repl(conf) -> None:
             continue
 
         # Create and display spinner
-        spinner = print_thinking_spinner(console)
-        with Live(spinner, console=console, refresh_per_second=10, transient=True):
+        spinner = Spinner("dots", text="[yellow]Thinking...[/]")
+        with console.status(spinner) as status:
             # Process the message and get results
             try:
                 result = process_chat_message(prompt, chat_id, conf.root, conf.file_mask)
