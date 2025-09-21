@@ -35,21 +35,11 @@ app.add_typer(snap_app, name="snap")
 # Authentication commands
 # ----------------------------------------------------------------------
 @auth_app.command()
-def login(
-    url: str = typer.Option(
-        "https://auth.example.com/cli-login",
-        "--url",
-        help="Login page that returns a one‑time token",
-    )
-):
+def login():
     """
-    Configure username and token for authenticating with the aye service.
-    
-    Examples:
-    aye auth login
-    aye auth login --url https://my-auth-service.com/login
+    Configure personal access token for authenticating with the aye service.
     """
-    handle_login(url)
+    handle_login()
 
 
 @auth_app.command()

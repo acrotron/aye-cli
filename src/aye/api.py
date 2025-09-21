@@ -12,7 +12,7 @@ TIMEOUT = 30.0
 
 
 def _auth_headers() -> Dict[str, str]:
-    token = "aye_XXX" #get_token()
+    token = get_token()
     if not token:
         raise RuntimeError("No auth token – run `aye login` first.")
     return {"Authorization": f"Bearer {token}"}

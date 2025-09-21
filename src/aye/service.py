@@ -26,10 +26,10 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
 _diff_console = Console(force_terminal=True, markup=False, color_system="standard")
 
 # Authentication functions (from auth.py)
-def handle_login(url: str) -> None:
+def handle_login() -> None:
     """Configure username and token for authenticating with the aye service."""
     from .auth import login_flow
-    login_flow(url)
+    login_flow()
 
 
 def handle_logout() -> None:

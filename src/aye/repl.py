@@ -29,6 +29,7 @@ from .service import (
 from .ui import (
     print_welcome_message,
     print_prompt,
+    print_error,
     print_assistant_response,
     print_no_files_changed,
     print_files_updated
@@ -105,14 +106,29 @@ def chat_repl(conf) -> None:
             continue
 
         # Create and display spinner
-        spinner = Spinner("dots", text="[yellow]Thinking...[/]")
-        with console.status(spinner) as status:
+        #spinner = Spinner("dots", text="[yellow]Thinking...[/]")
+        #with console.status(spinner) as status:
+        if True:
             # Process the message and get results
             try:
-                result = process_chat_message(prompt, chat_id, conf.root, conf.file_mask)
+                spinner = Spinner("dots", text="[yellow]Thinking...[/]")
+                with console.status(spinner) as status:
+                    result = process_chat_message(prompt, chat_id, conf.root, conf.file_mask)
             except Exception as exc:
-                from .ui import print_error
-                print_error(exc)
+                # If the exception is a HTTP‑error with a 403 status, handle it specially
+                if hasattr(exc, "response") and getattr(exc.response, "status_code", None) == 403:
+                    # 403 → unauthorized / token missing / invalid
+                    from .ui import print_error
+                    print_error(
+                        "[red]❌ Unauthorized:[/] the stored token is invalid or missing.\n"
+                        "Log in again with `aye auth login` or set a valid "
+                        "`AYE_TOKEN` environment variable.\n"
+                        "Obtain your personal access token at https://aye.acrotron.com"
+                    )
+                else:
+                    # any other kind of error
+                    from .ui import print_error
+                    print_error(exc)
                 continue
         
         # Extract and store new chat_id from response
