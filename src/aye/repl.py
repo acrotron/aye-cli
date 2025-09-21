@@ -15,6 +15,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.spinner import Spinner
 from rich.text import Text
+from rich import print as rprint
 
 from .service import (
     _is_valid_command,
@@ -28,13 +29,14 @@ from .service import (
 
 from .ui import (
     print_welcome_message,
+    print_help_message,
     print_prompt,
     print_error,
     print_assistant_response,
     print_no_files_changed,
     print_files_updated
 )
-from .snapshot import apply_updates
+from .snapshot import apply_updates, prune_snapshots
 
 
 def print_thinking_spinner() -> Spinner:
@@ -96,6 +98,28 @@ def chat_repl(conf) -> None:
         # Check for diff commands
         if first_token in {"/diff", "diff"}:
             handle_diff_command(tokens[1:])
+            continue
+
+        # Check for prune command
+        if first_token in {"/keep", "keep"}:
+            try:
+                keep_count = int(tokens[1]) if len(tokens) > 1 else 10
+                deleted = prune_snapshots(keep_count)
+                console.print(f"✅ {deleted} snapshots pruned. {keep_count} most recent kept.")
+            except Exception as e:
+                console.print(f"Error pruning snapshots: {e}")
+            continue
+
+        # Check for new chat command
+        if first_token in {"/new", "new"}:
+            chat_id_file.unlink(missing_ok=True)
+            chat_id = -1
+            console.print("[green]✅ New chat session started.[/]")
+            continue
+
+        # Check for help command
+        if first_token in {"/help", "help"}:
+            print_help_message()
             continue
 
         # Handle shell commands with or without forward slash

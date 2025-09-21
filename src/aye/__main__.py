@@ -148,18 +148,18 @@ def restore(
 # Snapshot cleanup/pruning commands
 # ----------------------------------------------------------------------
 @snap_app.command()
-def prune(
-    keep: int = typer.Option(10, "--keep", "-k", help="Number of recent snapshots to keep (default: 10)"),
+def keep(
+    num: int = typer.Option(10, "--num", "-n", help="Number of recent snapshots to keep (default: 10)"),
 ):
     """
     Delete all but the most recent N snapshots.
     
     Examples:
-    aye snap prune
-    aye snap prune --keep 5
-    aye snap prune -k 3
+    aye snap keep
+    aye snap keep --num 5
+    aye snap keep -n 3
     """
-    handle_prune_cmd(keep)
+    handle_prune_cmd(num)
 
 
 @snap_app.command()
