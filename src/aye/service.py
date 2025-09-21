@@ -223,8 +223,35 @@ def handle_diff_command(args: list[str]) -> None:
         rprint("[red]Error:[/] Too many arguments for diff command.")
 
 
+def _python_diff_files(file1: Path, file2: Path) -> None:
+    """Show diff between two files using Python's difflib."""
+    try:
+        from difflib import unified_diff
+        
+        # Read file contents
+        content1 = file1.read_text().splitlines(keepends=True) if file1.exists() else []
+        content2 = file2.read_text().splitlines(keepends=True) if file2.exists() else []
+        
+        # Generate unified diff
+        diff = unified_diff(
+            content2,  # from file (snapshot)
+            content1,  # to file (current)
+            fromfile=str(file2),
+            tofile=str(file1)
+        )
+        
+        # Convert diff to string and print
+        diff_str = ''.join(diff)
+        if diff_str.strip():
+            _diff_console.print(diff_str)
+        else:
+            rprint("[green]No differences found.[/]")
+    except Exception as e:
+        rprint(f"[red]Error running Python diff:[/] {e}")
+
+
 def diff_files(file1: Path, file2: Path) -> None:
-    """Show diff between two files using system diff command."""
+    """Show diff between two files using system diff command or Python fallback."""
     try:
         result = subprocess.run(
             ["diff", "--color=always", "-u", str(file2), str(file1)],
@@ -237,7 +264,8 @@ def diff_files(file1: Path, file2: Path) -> None:
         else:
             rprint("[green]No differences found.[/]")
     except FileNotFoundError:
-        rprint("[red]Error:[/] 'diff' command not found. Please install diffutils.")
+        # Fallback to Python's difflib if system diff is not available
+        _python_diff_files(file1, file2)
     except Exception as e:
         rprint(f"[red]Error running diff:[/] {e}")
 
