@@ -47,7 +47,7 @@ def logout():
     """
     Remove the stored aye credentials.
     
-    Examples:
+    Examples: \n
     aye auth logout
     """
     handle_logout()
@@ -68,9 +68,9 @@ def generate(
     """
     Send a single prompt to the backend.
     
-    Examples:
-    aye generate "Create a function that reverses a string"
-    aye generate "Add type hints to this function" --mode append
+    Examples: \n
+    aye generate "Create a function that reverses a string" \n
+    aye generate "Add type hints to this function" --mode append \n
     """
     handle_generate_cmd(prompt, mode)
 
@@ -89,10 +89,10 @@ def chat(
     """
     Start an interactive REPL. Use /exit or Ctrl‑D to leave.
     
-    Examples:
-    aye chat
-    aye chat --root ./src
-    aye chat --file-mask "*.js" --root ./frontend
+    Examples: \n
+    aye chat \n
+    aye chat --root ./src \n
+    aye chat --file-mask "*.js" --root ./frontend \n
     """
     handle_chat(root, file_mask)
 
@@ -106,9 +106,9 @@ def history(
     """
     Show timestamps of saved snapshots for *file* or all snapshots if no file provided.
     
-    Examples:
-    aye snap history
-    aye snap history src/main.py
+    Examples: \n
+    aye snap history \n
+    aye snap history src/main.py \n
     """
     handle_history_cmd(file)
 
@@ -121,8 +121,8 @@ def show(
     """
     Print the contents of a specific snapshot.
     
-    Examples:
-    aye snap show src/main.py 001
+    Examples: \n
+    aye snap show src/main.py 001 \n
     """
     handle_snap_show_cmd(file, ordinal)
 
@@ -136,10 +136,10 @@ def restore(
     Replace all files with the latest snapshot or specified snapshot by ordinal.
     If file_name is provided, only that file is restored.
     
-    Examples:
-    aye snap restore
-    aye snap restore 001
-    aye snap restore 001 myfile.py
+    Examples:\n
+    aye snap restore \n
+    aye snap restore 001 \n
+    aye snap restore 001 myfile.py \n
     """
     handle_restore_cmd(ordinal, file_name)
 
@@ -154,10 +154,10 @@ def keep(
     """
     Delete all but the most recent N snapshots.
     
-    Examples:
-    aye snap keep
-    aye snap keep --num 5
-    aye snap keep -n 3
+    Examples: \n
+    aye snap keep \n
+    aye snap keep --num 5 \n
+    aye snap keep -n 3 \n
     """
     handle_prune_cmd(num)
 
@@ -169,10 +169,10 @@ def cleanup(
     """
     Delete snapshots older than N days.
     
-    Examples:
-    aye snap cleanup
-    aye snap cleanup --days 7
-    aye snap cleanup -d 14
+    Examples: \n
+    aye snap cleanup \n
+    aye snap cleanup --days 7 \n
+    aye snap cleanup -d 14 \n
     """
     handle_cleanup_cmd(days)
 
@@ -189,17 +189,17 @@ def config(
     """
     Manage configuration values for file masks, root directories, and other settings.
     
-    Actions:
-    - list: Show all configuration values
-    - get: Retrieve a specific configuration value
-    - set: Set a configuration value
-    - delete: Remove a configuration value
+    Actions: \n
+    - list: Show all configuration values \n
+    - get: Retrieve a specific configuration value \n
+    - set: Set a configuration value \n
+    - delete: Remove a configuration value \n
     
-    Examples:
-    aye config list
-    aye config get file_mask
-    aye config set file_mask "*.py,*.js"
-    aye config delete file_mask
+    Examples: \n
+    aye config list \n
+    aye config get file_mask \n
+    aye config set file_mask "*.py,*.js" \n
+    aye config delete file_mask \n
     """
     if action == "list":
         handle_config_list()

@@ -92,7 +92,9 @@ def chat_repl(conf) -> None:
 
         # Check for restore commands
         if first_token in {"/restore", "/revert", "restore", "revert"}:
-            handle_restore_command(None)
+            ordinal = tokens[1] if len(tokens) > 1 else None
+            file_name = tokens[2] if len(tokens) > 2 else None
+            handle_restore_command(ordinal, file_name)
             continue
 
         # Check for diff commands
@@ -172,8 +174,9 @@ def chat_repl(conf) -> None:
         
         if not updated_files:
             print_no_files_changed(console)
-        elif updated_files:
+        else:  # when updated_files is not empty
             batch_ts = apply_updates(updated_files)
-            file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
-            if file_names:
-                print_files_updated(console, file_names)
+            if batch_ts:  # only show update message if files were actually written
+                file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
+                if file_names:
+                    print_files_updated(console, file_names)

@@ -69,7 +69,7 @@ def collect_sources(
     # Load ignore patterns from .ayeignore file
     ignore_patterns = _load_ignore_patterns(base_path)
 
-    masks: List[str] = [ m.strip() for m in file_mask.split(",") if m.strip() ]  # e.g. ["*.py", "*.jsx"]
+    masks: List[str] = [m.strip() for m in file_mask.split(",") if m.strip()]  # e.g. ["*.py", "*.jsx"]
 
     def _iter_for(mask: str) -> Iterable[Path]:
         return base_path.rglob(mask) if recursive else base_path.glob(mask)
