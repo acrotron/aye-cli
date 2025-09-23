@@ -83,7 +83,7 @@ def chat(
         None, "--root", "-r", help="Root folder where source files are located."
     ),
     file_mask: str = typer.Option(
-        "*.py", "--file-mask", "-m", help="File mask for source files to include into generation."
+        "*.py", "--file-mask", "-m", help="File mask for source files to include into generation. Comma-separated masks are allowed."
     ),
 ):
     """

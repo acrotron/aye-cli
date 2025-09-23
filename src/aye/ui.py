@@ -22,6 +22,7 @@ def print_help_message():
     rprint("")
     #rprint("Shell commands (e.g., ls, git) are also supported without the leading slash.")
     rprint("[yellow]If the first word does not match chat or shell command, entire prompt will be sent to LLM for response[/]")
+    rprint("[yellow]Multiple comma-separated file masks are supported (e.g., \"*.py,*.js\").[/]")
 
 
 def print_prompt():

@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Dict, Any, Set
+from typing import Dict, Any, Set, List, Iterable
+from itertools import chain
 
 
 def _is_hidden(path: Path) -> bool:
@@ -68,10 +69,15 @@ def collect_sources(
     # Load ignore patterns from .ayeignore file
     ignore_patterns = _load_ignore_patterns(base_path)
 
-    # Choose iterator based on ``recursive`` flag
-    iterator = base_path.rglob(file_mask) if recursive else base_path.glob(file_mask)
+    masks: List[str] = [ m.strip() for m in file_mask.split(",") if m.strip() ]  # e.g. ["*.py", "*.jsx"]
 
-    for py_file in iterator:
+    def _iter_for(mask: str) -> Iterable[Path]:
+        return base_path.rglob(mask) if recursive else base_path.glob(mask)
+
+    # Chain all iterators; convert to a set to deduplicate paths
+    all_matches: Set[Path] = set(chain.from_iterable(_iter_for(m) for m in masks))
+
+    for py_file in all_matches:
         # Skip hidden subfolders (any part of the path starting with '.')
         if _is_hidden(py_file.relative_to(base_path)):
             continue
