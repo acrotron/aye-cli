@@ -15,7 +15,7 @@ def print_help_message():
     rprint("  exit, quit               - Exit the chat session")
     rprint("  history                  - Show snapshot history")
     rprint("  restore, revert          - Restore latest snapshot")
-    rprint("  diff \[file\] \[snapshot\]   - Show diff of file with snapshot")
+    rprint("  diff `[file`] `[snapshot`]   - Show diff of file with snapshot")
     rprint("  keep [N]                 - Keep only N most recent snapshots (10 by default)")
     rprint("  new                      - Start a new chat session")
     rprint("  help                     - Show this help message")
