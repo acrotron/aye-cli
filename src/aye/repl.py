@@ -7,8 +7,6 @@ from typing import Optional
 import typer
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
-from prompt_toolkit.completion import PathCompleter
-from .completers import CmdPathCompleter
 from prompt_toolkit.shortcuts import CompleteStyle
 
 from rich.console import Console
@@ -44,10 +42,22 @@ def print_thinking_spinner() -> Spinner:
     return Spinner("dots", text="[yellow]Thinking...[/]")
 
 
+from .plugins.manager import PluginManager
+from .auth import get_token
+    
+# Initialize plugin manager and get completer
+plugin_manager = PluginManager()
+plugin_manager.discover()
+    
 def chat_repl(conf) -> None:
+    # Get completer from plugin manager
+    # Get completer through plugin system
+    completer_response = plugin_manager.handle_command("get_completer")
+    completer = completer_response["completer"] if completer_response else None
+    
     session = PromptSession(
         history=InMemoryHistory(),
-        completer=CmdPathCompleter(),
+        completer=completer,
         complete_style=CompleteStyle.READLINE_LIKE,   # "readline" style, no menu
         complete_while_typing=False)
 

@@ -30,6 +30,34 @@ def handle_login() -> None:
     """Configure username and token for authenticating with the aye service."""
     from .auth import login_flow
     login_flow()
+    
+    # Download plugins based on user's license tier
+    from .download_plugins import fetch_plugins
+    from .auth import get_token
+    
+    try:
+        token = get_token()
+        if not token:
+            rprint("[yellow]No token found - skipping plugin download[/]")
+            return
+            
+        # Get user's license tier from server
+        import httpx
+        resp = httpx.get(
+            "https://api.acrotron.com/cli/license",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        tier_data = resp.json()
+        tier = tier_data.get("tier", "free")
+        
+        # Download plugins for this tier
+        fetch_plugins(tier)
+        rprint(f"[green]Premium features for {tier} tier ready.[/]")
+        
+    except Exception as e:
+        rprint(f"[yellow]Warning: Could not download plugins - {e}[/]")
 
 
 def handle_logout() -> None:
