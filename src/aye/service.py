@@ -64,7 +64,7 @@ def handle_logout() -> None:
     """Remove the stored aye credentials."""
     from .auth import delete_token
     delete_token()
-    rprint("\U0001f510 Token removed.")
+    rprint("🔐 Token removed.")
 
 
 # One-shot generation function
@@ -125,14 +125,14 @@ def handle_restore_cmd(ts: Optional[str], file_name: Optional[str] = None) -> No
         restore_snapshot(ts, file_name)
         if ts:
             if file_name:
-                rprint(f"\u2705 File '{file_name}' restored to {ts}")
+                rprint(f"✅ File '{file_name}' restored to {ts}")
             else:
-                rprint(f"\u2705 All files restored to {ts}")
+                rprint(f"✅ All files restored to {ts}")
         else:
             if file_name:
-                rprint(f"\u2705 File '{file_name}' restored to latest snapshot")
+                rprint(f"✅ File '{file_name}' restored to latest snapshot")
             else:
-                rprint(f"\u2705 All files restored to latest snapshot")
+                rprint(f"✅ All files restored to latest snapshot")
     except Exception as exc:
         rprint(f"Error: {exc}", err=True)
 
@@ -176,23 +176,6 @@ def handle_history_command() -> None:
         rprint("[bold]Snapshot History:[/]")
         for ts in timestamps:
             rprint(f"  {ts}")
-
-
-def handle_shell_command(command: str, args: list[str]) -> None:
-    """Handle arbitrary shell commands by checking if they exist in the system."""
-    if not _is_valid_command(command):
-        rprint(f"[red]Error:[/] Command '{command}' is not found or not executable.")
-        return
-    
-    try:
-        cmd = [command] + args
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        if result.stdout.strip():
-            rprint(result.stdout)
-    except subprocess.CalledProcessError as e:
-        rprint(f"[red]Error running {command} {' '.join(args)}:[/] {e.stderr}")
-    except FileNotFoundError:
-        rprint(f"[red]Error:[/] {command} is not installed or not found in PATH.")
 
 
 def handle_diff_command(args: list[str]) -> None:
@@ -346,9 +329,9 @@ def handle_prune_cmd(keep: int = 10) -> None:
     try:
         deleted_count = prune_snapshots(keep)
         if deleted_count > 0:
-            rprint(f"\u2705 {deleted_count} snapshots deleted. {keep} most recent snapshots kept.")
+            rprint(f"✅ {deleted_count} snapshots deleted. {keep} most recent snapshots kept.")
         else:
-            rprint("\u2705 No snapshots deleted. You have fewer than the specified keep count.")
+            rprint("✅ No snapshots deleted. You have fewer than the specified keep count.")
     except Exception as e:
         rprint(f"[red]Error pruning snapshots:[/] {e}")
 
@@ -359,9 +342,9 @@ def handle_cleanup_cmd(days: int = 30) -> None:
     try:
         deleted_count = cleanup_snapshots(days)
         if deleted_count > 0:
-            rprint(f"\u2705 {deleted_count} snapshots older than {days} days deleted.")
+            rprint(f"✅ {deleted_count} snapshots older than {days} days deleted.")
         else:
-            rprint(f"\u2705 No snapshots older than {days} days found.")
+            rprint(f"✅ No snapshots older than {days} days found.")
     except Exception as e:
         rprint(f"[red]Error cleaning up snapshots:[/] {e}")
 

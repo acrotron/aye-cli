@@ -16,10 +16,8 @@ from rich.text import Text
 from rich import print as rprint
 
 from .service import (
-    _is_valid_command,
     handle_restore_command,
     handle_history_command,
-    handle_shell_command,
     handle_diff_command,
     process_chat_message,
     filter_unchanged_files
@@ -136,9 +134,19 @@ def chat_repl(conf) -> None:
 
         # Handle shell commands with or without forward slash
         command = first_token.lstrip('/')
-        if _is_valid_command(command):
-            args = tokens[1:]
-            handle_shell_command(command, args)
+        # Replace direct shell command handling with plugin system
+        shell_response = plugin_manager.handle_command("execute_shell_command", {
+            "command": command,
+            "args": tokens[1:]
+        })
+        
+        if shell_response is not None:
+            # Plugin handled the command
+            if "error" in shell_response:
+                rprint(f"[red]Error:[/] {shell_response['error']}")
+            else:
+                if shell_response.get("stdout", "").strip():
+                    rprint(shell_response["stdout"])
             continue
 
         # Create and display spinner
