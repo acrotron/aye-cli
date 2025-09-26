@@ -16,9 +16,6 @@ from rich.text import Text
 from rich import print as rprint
 
 from .service import (
-    handle_restore_command,
-    handle_history_command,
-    handle_diff_command,
     process_chat_message,
     filter_unchanged_files
 )
@@ -32,7 +29,6 @@ from .ui import (
     print_no_files_changed,
     print_files_updated
 )
-from .snapshot import apply_updates, prune_snapshots
 
 
 def print_thinking_spinner() -> Spinner:
@@ -87,38 +83,32 @@ def chat_repl(conf) -> None:
 
         # Tokenize input to check for commands
         tokens = prompt.strip().split()
-        first_token = tokens[0].lower()
+        first_token = tokens[0].lower() if tokens else ""
 
         # Check for exit commands
         if first_token in {"/exit", "/quit", "exit", "quit", ":q", "/q"}:
             break
 
-        # Check for history commands
-        if first_token in {"/history", "history"}:
-            handle_history_command()
-            continue
-
-        # Check for restore commands
-        if first_token in {"/restore", "/revert", "restore", "revert"}:
-            ordinal = tokens[1] if len(tokens) > 1 else None
-            file_name = tokens[2] if len(tokens) > 2 else None
-            handle_restore_command(ordinal, file_name)
-            continue
-
-        # Check for diff commands
         if first_token in {"/diff", "diff"}:
+            # Note: Diff command still uses the original implementation
+            from .service import handle_diff_command
             handle_diff_command(tokens[1:])
             continue
 
-        # Check for prune command
-        if first_token in {"/keep", "keep"}:
-            try:
-                keep_count = int(tokens[1]) if len(tokens) > 1 else 10
-                deleted = prune_snapshots(keep_count)
-                console.print(f"✅ {deleted} snapshots pruned. {keep_count} most recent kept.")
-            except Exception as e:
-                console.print(f"Error pruning snapshots: {e}")
-            continue
+        # Handle snapshot-related commands through plugin manager
+        # Pass first token and remaining tokens to plugins
+        if first_token in {"/history", "history", "/restore", "/revert", "restore", "revert", "/keep", "keep"}:
+            # Extract remaining tokens as arguments
+            args = tokens[1:] if len(tokens) > 1 else []
+            
+            # Let plugin manager handle the command
+            response = plugin_manager.handle_command(first_token, {"args": args})
+            
+            # If plugin handled the command, continue to next prompt
+            if response and response.get("handled"):
+                continue
+            
+            # Fall through to shell command handling if not handled by plugins
 
         # Check for new chat command
         if first_token in {"/new", "new"}:
@@ -193,8 +183,16 @@ def chat_repl(conf) -> None:
         if not updated_files:
             print_no_files_changed(console)
         else:  # when updated_files is not empty
-            batch_ts = apply_updates(updated_files)
-            if batch_ts:  # only show update message if files were actually written
-                file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
-                if file_names:
-                    print_files_updated(console, file_names)
+            # Use plugin manager for apply_updates
+            updates_response = plugin_manager.handle_command("apply_updates", {
+                "updated_files": updated_files
+            })
+            
+            if updates_response and "batch_timestamp" in updates_response:
+                batch_ts = updates_response["batch_timestamp"]
+                if batch_ts:  # only show update message if files were actually written
+                    file_names = [item.get("file_name") for item in updated_files if "file_name" in item]
+                    if file_names:
+                        print_files_updated(console, file_names)
+            elif updates_response and "error" in updates_response:
+                rprint(f"[red]Error applying updates:[/] {updates_response['error']}")
