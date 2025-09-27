@@ -6,6 +6,10 @@ from typing import List, Dict
 import traceback
 import time
 import base64
+import shutil
+
+import binascii
+from typing import Union
 
 from .auth import get_token
 from .api import fetch_plugin_manifest, fetch_server_time
@@ -34,6 +38,9 @@ def fetch_plugins() -> None:
     if not token:
         return
 
+    # Wipeout if there are any leftovers
+    shutil.rmtree(str(PLUGIN_ROOT), ignore_errors=True)
+
     PLUGIN_ROOT.mkdir(parents=True, exist_ok=True)
 
     # Load any existing manifest so we can preserve previous timestamps
@@ -47,14 +54,20 @@ def fetch_plugins() -> None:
         # Use the dedicated API function instead of direct httpx call
         plugins = fetch_plugin_manifest()
 
+        #print(plugins)
+
         for name, entry in plugins.items():
             expected_hash = entry["sha256"]
             dest = PLUGIN_ROOT / name
 
-            # Download and verify only when file is missing or out-of-date
-            if not (dest.is_file() and _hash(dest.read_bytes()) == expected_hash):
-                data = base64.b64decode(entry["content"])
-                dest.write_bytes(data)
+            source_text = entry["content"]
+
+            computed_hash = hashlib.sha256(source_text.encode("utf‑8")).hexdigest()
+
+            if not (dest.is_file() and computed_hash == expected_hash):
+                dest.write_text(entry["content"])
+            else:
+                print(f"{name}: hash does not match")
 
             # Always populate manifest entry irrespective of download skip
             # Preserve previous timestamps if we already have them
