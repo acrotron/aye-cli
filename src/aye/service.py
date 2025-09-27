@@ -41,20 +41,9 @@ def handle_login() -> None:
             rprint("[yellow]No token found - skipping plugin download[/]")
             return
             
-        # Get user's license tier from server
-        import httpx
-        resp = httpx.get(
-            "https://api.acrotron.com/cli/license",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        tier_data = resp.json()
-        tier = tier_data.get("tier", "free")
-        
         # Download plugins for this tier
-        fetch_plugins(tier)
-        rprint(f"[green]Premium features for {tier} tier ready.[/]")
+        fetch_plugins()
+        #rprint(f"[green]Premium features for {tier} tier ready.[/]")
         
     except Exception as e:
         rprint(f"[yellow]Warning: Could not download plugins - {e}[/]")

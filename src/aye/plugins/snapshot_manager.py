@@ -3,9 +3,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+
 from .base import Plugin
 from rich import print as rprint
-
 
 SNAP_ROOT = Path(".aye/snapshots").resolve()
 LATEST_SNAP_DIR = SNAP_ROOT / "latest"
@@ -22,12 +22,11 @@ class SnapshotManagerPlugin(Plugin):
 
     def _get_next_ordinal(self) -> int:
         """Get the next ordinal number by checking existing snapshot directories."""
-        batches_root = SNAP_ROOT
-        if not batches_root.is_dir():
+        if not SNAP_ROOT.is_dir():
             return 1
         
         ordinals = []
-        for batch_dir in batches_root.iterdir():
+        for batch_dir in SNAP_ROOT.iterdir():
             if batch_dir.is_dir() and "_" in batch_dir.name and batch_dir.name != "latest":
                 try:
                     ordinal = int(batch_dir.name.split("_")[0])
@@ -39,12 +38,11 @@ class SnapshotManagerPlugin(Plugin):
 
     def _get_latest_snapshot_dir(self) -> Optional[Path]:
         """Get the latest snapshot directory by finding the one with the highest ordinal."""
-        batches_root = SNAP_ROOT
-        if not batches_root.is_dir():
+        if not SNAP_ROOT.is_dir():
             return None
         
         snapshot_dirs = []
-        for batch_dir in batches_root.iterdir():
+        for batch_dir in SNAP_ROOT.iterdir():
             if batch_dir.is_dir() and "_" in batch_dir.name and batch_dir.name != "latest":
                 try:
                     ordinal = int(batch_dir.name.split("_")[0])
@@ -67,13 +65,12 @@ class SnapshotManagerPlugin(Plugin):
         batch_dir.mkdir(parents=True, exist_ok=True)
         return batch_dir
 
-    def _list_all_snapshots_with_metadata(self):
+    def _list_all_snapshots_with_metadata(self) -> List[str]:
         """List all snapshots in descending order with file names from metadata."""
-        batches_root = SNAP_ROOT
-        if not batches_root.is_dir():
+        if not SNAP_ROOT.is_dir():
             return []
 
-        timestamps = [p.name for p in batches_root.iterdir() if p.is_dir() and p.name != "latest"]
+        timestamps = [p.name for p in SNAP_ROOT.iterdir() if p.is_dir() and p.name != "latest"]
         timestamps.sort(reverse=True)
         result = []
         for ts in timestamps:
@@ -83,7 +80,7 @@ class SnapshotManagerPlugin(Plugin):
             else:
                 formatted_ts = ts
                 
-            meta_path = batches_root / ts / "metadata.json"
+            meta_path = SNAP_ROOT / ts / "metadata.json"
             if meta_path.exists():
                 meta = json.loads(meta_path.read_text())
                 files = [Path(entry["original"]).name for entry in meta["files"]]
@@ -156,12 +153,11 @@ class SnapshotManagerPlugin(Plugin):
         if file is None:
             return self._list_all_snapshots_with_metadata()
         
-        batches_root = SNAP_ROOT
-        if not batches_root.is_dir():
+        if not SNAP_ROOT.is_dir():
             return []
 
         snapshots = []
-        for batch_dir in batches_root.iterdir():
+        for batch_dir in SNAP_ROOT.iterdir():
             if batch_dir.is_dir() and batch_dir.name != "latest":
                 meta_path = batch_dir / "metadata.json"
                 if meta_path.exists():
@@ -247,14 +243,11 @@ class SnapshotManagerPlugin(Plugin):
 
     def prune_snapshots(self, keep_count: int = 10) -> int:
         """Delete all but the most recent N snapshots. Returns number of deleted snapshots."""
-        from datetime import datetime
-        
-        batches_root = SNAP_ROOT
-        if not batches_root.is_dir():
+        if not SNAP_ROOT.is_dir():
             return 0
 
         snapshots = []
-        for batch_dir in batches_root.iterdir():
+        for batch_dir in SNAP_ROOT.iterdir():
             if batch_dir.is_dir() and "_" in batch_dir.name and batch_dir.name != "latest":
                 try:
                     ts_part = batch_dir.name.split("_", 1)[1]
@@ -293,7 +286,7 @@ class SnapshotManagerPlugin(Plugin):
                 rprint(f"  {ts}")
 
     def _handle_restore_command(self, tokens: List[str]) -> None:
-        """Handle the restore command logic and output.""" 
+        """Handle the restore command logic and output."""
         ordinal = tokens[0] if tokens else None
         file_name = tokens[1] if len(tokens) > 1 else None
         
@@ -324,7 +317,6 @@ class SnapshotManagerPlugin(Plugin):
     def on_command(self, command_name: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle snapshot-related commands through plugin system."""
         try:
-            # Handle snapshot commands based on the first token
             if command_name in {"history", "/history"}:
                 self._handle_history_command()
                 return {"handled": True}

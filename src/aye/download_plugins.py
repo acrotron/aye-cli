@@ -7,7 +7,7 @@ from .auth import get_token
 
 PLUGIN_ROOT = Path.home() / ".aye" / "plugins"
 MANIFEST_FILE = PLUGIN_ROOT / "manifest.json"
-SERVER_URL = "https://api.acrotron.com/cli/plugins"
+SERVER_URL = "https://api.acrotron.com/plugins"
 MAX_AGE = 86400  # 24 hours
 
 
@@ -20,7 +20,7 @@ def _is_fresh(manifest: Dict) -> bool:
     return manifest.get("expires", 0) > checked + MAX_AGE
 
 
-def fetch_plugins(tier: str) -> None:
+def fetch_plugins() -> None:
     token = get_token()
     if not token:
         return
@@ -29,9 +29,9 @@ def fetch_plugins(tier: str) -> None:
 
     try:
         resp = httpx.get(
-            f"{SERVER_URL}?tier={tier}",
+            f"{SERVER_URL}",
             headers={"Authorization": f"Bearer {token}"},
-            timeout=15.0
+            timeout=30.0
         )
         resp.raise_for_status()
         plugins: List[Dict] = resp.json()
@@ -47,15 +47,15 @@ def fetch_plugins(tier: str) -> None:
                 continue
 
             # Download and verify
-            data = httpx.get(url, timeout=15.0).content
-            if _hash(data) != expected_hash:
-                raise RuntimeError(f"Checksum mismatch for plugin {name}")
+            ##data = httpx.get(url, timeout=15.0).content
+            ##if _hash(data) != expected_hash:
+            ##    raise RuntimeError(f"Checksum mismatch for plugin {name}")
 
             dest.write_bytes(data)
 
         # Write manifest
         manifest = {
-            "tier": tier,
+            #"tier": tier,
             "checked": int(httpx.get('https://api.acrotron.com/time').json()['timestamp']),
             "plugins": plugins
         }

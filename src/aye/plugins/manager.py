@@ -5,8 +5,11 @@ from typing import Dict, List, Optional, Any
 from rich import print as rprint
 from .base import Plugin
 
-#PLUGIN_ROOT = Path.home() / ".aye" / "plugins"
-PLUGIN_ROOT = Path("/home/vmayorskiy/git/cli/src/aye/plugins")
+PLUGIN_ROOT = Path.home() / ".aye" / "plugins"
+PATH_ROOT = Path.home() / ".aye"
+sys.path.insert(0, str(PATH_ROOT))
+
+#PLUGIN_ROOT = Path("/home/vmayorskiy/git/cli/src/aye/plugins")
 
 class PluginManager:
     def __init__(self, tier: str = "free"):
