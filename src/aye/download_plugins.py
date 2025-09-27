@@ -3,11 +3,15 @@ import json
 import httpx
 from pathlib import Path
 from typing import List, Dict
+import traceback
+import time
+import base64
+
 from .auth import get_token
+from .api import fetch_plugin_manifest, fetch_server_time
 
 PLUGIN_ROOT = Path.home() / ".aye" / "plugins"
 MANIFEST_FILE = PLUGIN_ROOT / "manifest.json"
-SERVER_URL = "https://api.acrotron.com/plugins"
 MAX_AGE = 86400  # 24 hours
 
 
@@ -20,6 +24,11 @@ def _is_fresh(manifest: Dict) -> bool:
     return manifest.get("expires", 0) > checked + MAX_AGE
 
 
+def _now_ts() -> int:
+    """Return current Unix epoch time (seconds)."""
+    return int(time.time())
+
+
 def fetch_plugins() -> None:
     token = get_token()
     if not token:
@@ -27,39 +36,56 @@ def fetch_plugins() -> None:
 
     PLUGIN_ROOT.mkdir(parents=True, exist_ok=True)
 
+    # Load any existing manifest so we can preserve previous timestamps
     try:
-        resp = httpx.get(
-            f"{SERVER_URL}",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=30.0
-        )
-        resp.raise_for_status()
-        plugins: List[Dict] = resp.json()
+        old_manifest = json.loads(MANIFEST_FILE.read_text())
+    except Exception:
+        old_manifest = {}
 
-        for entry in plugins:
-            name = entry["name"]
-            url = entry["url"]
+    manifest = {}
+    try:
+        # Use the dedicated API function instead of direct httpx call
+        plugins = fetch_plugin_manifest()
+
+        for name, entry in plugins.items():
             expected_hash = entry["sha256"]
-            dest = PLUGIN_ROOT / f"{name}.py"
+            dest = PLUGIN_ROOT / name
 
-            # Skip if file exists and hash matches
-            if dest.is_file() and _hash(dest.read_bytes()) == expected_hash:
-                continue
+            # Download and verify only when file is missing or out-of-date
+            if not (dest.is_file() and _hash(dest.read_bytes()) == expected_hash):
+                data = base64.b64decode(entry["content"])
+                dest.write_bytes(data)
 
-            # Download and verify
-            ##data = httpx.get(url, timeout=15.0).content
-            ##if _hash(data) != expected_hash:
-            ##    raise RuntimeError(f"Checksum mismatch for plugin {name}")
+            # Always populate manifest entry irrespective of download skip
+            # Preserve previous timestamps if we already have them
+            prev = old_manifest.get(name, {})
+            checked = prev.get("checked", _now_ts())
+            expires = prev.get("expires", checked + MAX_AGE)
 
-            dest.write_bytes(data)
+            manifest[name] = {
+                "sha256": expected_hash,
+                "checked": checked,
+                "expires": expires,
+            }
 
-        # Write manifest
-        manifest = {
-            #"tier": tier,
-            "checked": int(httpx.get('https://api.acrotron.com/time').json()['timestamp']),
-            "plugins": plugins
-        }
-        MANIFEST_FILE.write_text(json.dumps(manifest))
+        # Write manifest with all plugins
+        # Sort keys so the file is deterministic – helpful for tests / diffs
+        sorted_manifest = {k: manifest[k] for k in sorted(manifest)}
+        MANIFEST_FILE.write_text(json.dumps(sorted_manifest, indent=4))
 
     except Exception as e:
+        traceback.print_exc()
         raise RuntimeError(f"Failed to fetch plugins: {e}")
+
+
+def driver() -> None:
+    """Driver function to call fetch_plugins."""
+    try:
+        fetch_plugins()
+        print("Plugins fetched successfully.")
+    except Exception as e:
+        print(f"Error fetching plugins: {e}")
+
+
+if __name__ == "__main__":
+    driver()
