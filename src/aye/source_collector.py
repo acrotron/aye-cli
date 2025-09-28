@@ -7,24 +7,46 @@ def _is_hidden(path: Path) -> bool:
     """Return True if *path* or any of its ancestors is a hidden directory.
 
     Hidden directories are those whose name starts with a dot (".").
-    """
+    """ 
     return any(part.startswith(".") for part in path.parts)
 
 
-def _load_ignore_patterns(root_path: Path) -> list[str]:
-    """Load ignore patterns from .ayeignore file in the root directory."""
-    ignore_file = root_path / ".ayeignore"
-    if not ignore_file.exists():
-        return []
-    
+def _load_patterns_from_file(file_path: Path) -> List[str]:
+    """Load patterns from a single ignore file, filtering out empty lines and comments."""
     try:
-        patterns = ignore_file.read_text(encoding="utf-8").splitlines()
+        patterns = file_path.read_text(encoding="utf-8").splitlines()
         # Filter out empty lines and comments
-        return [pattern.strip() for pattern in patterns 
-                if pattern.strip() and not pattern.strip().startswith("#")]
+        return [
+            pattern.strip() for pattern in patterns 
+            if pattern.strip() and not pattern.strip().startswith("#")
+        ]
     except Exception:
-        # If we can't read the file, proceed without ignore patterns
+        # If we can't read the file, proceed without its ignore patterns
         return []
+
+
+def _load_ignore_patterns(root_path: Path) -> list[str]:
+    """Load ignore patterns from .ayeignore and .gitignore files in the root directory and all parent directories."""
+    ignore_patterns = []
+    
+    # Start from root_path and go up through all parent directories
+    current_path = root_path.resolve()
+    
+    # Include .ayeignore and .gitignore from all parent directories
+    while current_path != current_path.parent:  # Stop when we reach the root directory
+        # Load .ayeignore file
+        ayeignore_file = current_path / ".ayeignore"
+        if ayeignore_file.exists():
+            ignore_patterns.extend(_load_patterns_from_file(ayeignore_file))
+        
+        # Load .gitignore file
+        gitignore_file = current_path / ".gitignore"
+        if gitignore_file.exists():
+            ignore_patterns.extend(_load_patterns_from_file(gitignore_file))
+        
+        current_path = current_path.parent
+    
+    return ignore_patterns
 
 
 def _matches_ignore_pattern(path: Path, ignore_patterns: list[str], base_path: Path) -> bool:
@@ -66,7 +88,7 @@ def collect_sources(
     if not base_path.is_dir():
         raise NotADirectoryError(f"'{root_dir}' is not a valid directory")
 
-    # Load ignore patterns from .ayeignore file
+    # Load ignore patterns from .ayeignore and .gitignore files
     ignore_patterns = _load_ignore_patterns(base_path)
 
     masks: List[str] = [m.strip() for m in file_mask.split(",") if m.strip()]  # e.g. ["*.py", "*.jsx"]
@@ -93,8 +115,8 @@ def collect_sources(
             rel_key = py_file.relative_to(base_path).as_posix()
             sources[rel_key] = content
         except UnicodeDecodeError:
-            # Skip non‑UTF8 files
-            print(f"   Skipping non‑UTF8 file: {py_file}")
+            # Skip non-UTF8 files
+            print(f"   Skipping non-UTF8 file: {py_file}")
 
     return sources
 
