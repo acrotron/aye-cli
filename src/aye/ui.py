@@ -7,12 +7,27 @@ from rich import print as rprint
 
 def print_welcome_message():
     """Display the welcome message for the Aye CLI."""
-    rprint("[bold cyan]Aye CLI – type /exit or Ctrl‑D to quit[/]")
+    rprint("[bold cyan]Aye CLI – type `help` for available commands, `exit` or Ctrl‑D to quit[/]")
+
+
+def print_help_message():
+    rprint("[bold]Available chat commands:[/]")
+    rprint("  exit, quit               - Exit the chat session")
+    rprint("  history                  - Show snapshot history")
+    rprint("  restore, revert          - Restore latest snapshot")
+    rprint("  diff `[file`] `[snapshot`]   - Show diff of file with snapshot")
+    rprint("  keep [N]                 - Keep only N most recent snapshots (10 by default)")
+    rprint("  new                      - Start a new chat session")
+    rprint("  help                     - Show this help message")
+    rprint("")
+    #rprint("Shell commands (e.g., ls, git) are also supported without the leading slash.")
+    rprint("[yellow]If the first word does not match chat or shell command, entire prompt will be sent to LLM for response[/]")
+    rprint("[yellow]Multiple comma-separated file masks are supported (e.g., \"*.py,*.js\").[/]")
 
 
 def print_prompt():
     """Display the prompt symbol for user input."""
-    return "(ツ » "
+    return "(ツ» "
 
 
 def print_thinking_spinner(console: Console) -> Spinner:
@@ -24,7 +39,7 @@ def print_assistant_response(summary: str):
     """Display the assistant's response summary."""
     rprint()
     color = "rgb(170,170,170)"
-    bot_face = "-{•_•}-"
+    bot_face = "-{•!•}-"
     rprint(f"[{color}]{bot_face} » {summary}[/]")
     rprint()
 

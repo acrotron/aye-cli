@@ -9,8 +9,14 @@ from typing import Optional, List, Dict
 
 from .api import cli_invoke
 from .source_collector import collect_sources
-from .snapshot import restore_snapshot, list_snapshots, create_snapshot
+from .snapshot import restore_snapshot, list_snapshots, create_snapshot, apply_updates
 from .config import get_value, set_value, delete_value, list_config
+from .ui import (
+    print_assistant_response,
+    print_no_files_changed,
+    print_files_updated,
+    print_error
+)
 
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
@@ -20,36 +26,44 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
 _diff_console = Console(force_terminal=True, markup=False, color_system="standard")
 
 # Authentication functions (from auth.py)
-def handle_login(url: str) -> None:
+def handle_login() -> None:
     """Configure username and token for authenticating with the aye service."""
     from .auth import login_flow
-    login_flow(url)
+    login_flow()
+    
+    # Download plugins based on user's license tier
+    from .download_plugins import fetch_plugins
+    from .auth import get_token
+    
+    try:
+        token = get_token()
+        if not token:
+            rprint("[yellow]No token found - skipping plugin download[/]")
+            return
+            
+        # Download plugins for this tier
+        fetch_plugins()
+        #rprint(f"[green]Premium features for {tier} tier ready.[/]")
+        
+    except Exception as e:
+        rprint(f"[yellow]Warning: Could not download plugins - {e}[/]")
 
 
 def handle_logout() -> None:
     """Remove the stored aye credentials."""
     from .auth import delete_token
     delete_token()
-    rprint("\U0001f510 Token removed.")
+    rprint("🔐 Token removed.")
 
 
 # One-shot generation function
-def handle_generate_cmd(prompt: str, file: Optional[Path], mode: str) -> None:
+def handle_generate_cmd(prompt: str) -> None:
     """
-    Send a single prompt to the backend.  If `file` is supplied,
-    the file is snapshotted first, then overwritten/appended.
+    Send a single prompt to the backend.
     """
-    if file:
-        create_snapshot([file])          # ← undo point
-
-    resp = cli_invoke(message=prompt, filename=str(file) if file else None, mode=mode)
+    resp = cli_invoke(message=prompt)
     code = resp.get("generated_code", "")
-
-    if file:
-        file.write_text(code)
-        rprint(f"\u2705 {file} updated (snapshot taken)")
-    else:
-        rprint(code)
+    rprint(code)
 
 
 # Chat function
@@ -65,6 +79,13 @@ def handle_chat(root: Path, file_mask: str) -> None:
     conf.root = root
     conf.file_mask = file_mask
     chat_repl(conf)
+
+
+def process_repl_message(prompt: str, chat_id: Optional[int], root: Path, file_mask: str, chat_id_file: Path, console: Console) -> None:
+    """Process a REPL message and handle the response."""
+    # This function is now deprecated and should not be used
+    # The processing logic has been moved to repl.py to fix the spinner issue
+    pass
 
 
 # Snapshot functions
@@ -87,14 +108,20 @@ def handle_snap_show_cmd(file: Path, ts: str) -> None:
     rprint("Snapshot not found.", err=True)
 
 
-def handle_restore_cmd(ts: Optional[str]) -> None:
+def handle_restore_cmd(ts: Optional[str], file_name: Optional[str] = None) -> None:
     """Replace all files with the latest snapshot or specified snapshot."""
     try:
-        restore_snapshot(ts)
+        restore_snapshot(ts, file_name)
         if ts:
-            rprint(f"\u2705 All files restored to {ts}")
+            if file_name:
+                rprint(f"✅ File '{file_name}' restored to {ts}")
+            else:
+                rprint(f"✅ All files restored to {ts}")
         else:
-            rprint(f"\u2705 All files restored to latest snapshot")
+            if file_name:
+                rprint(f"✅ File '{file_name}' restored to latest snapshot")
+            else:
+                rprint(f"✅ All files restored to latest snapshot")
     except Exception as exc:
         rprint(f"Error: {exc}", err=True)
 
@@ -111,14 +138,20 @@ def _is_valid_command(command: str) -> bool:
         return False
 
 
-def handle_restore_command(timestamp: str | None = None) -> None:
+def handle_restore_command(timestamp: str | None = None, file_name: str | None = None) -> None:
     """Handle the restore command logic.""" 
     try:
-        restore_snapshot(timestamp)
+        restore_snapshot(timestamp, file_name)
         if timestamp:
-            rprint(f"[green]All files restored to {timestamp}[/]")
+            if file_name:
+                rprint(f"[green]File '{file_name}' restored to {timestamp}[/]")
+            else:
+                rprint(f"[green]All files restored to {timestamp}[/]")
         else:
-            rprint("[green]All files restored to latest snapshot.[/]")
+            if file_name:
+                rprint(f"[green]File '{file_name}' restored to latest snapshot.[/]")
+            else:
+                rprint("[green]All files restored to latest snapshot.[/]")
     except Exception as e:
         rprint(f"[red]Error restoring snapshot:[/] {e}")
 
@@ -132,23 +165,6 @@ def handle_history_command() -> None:
         rprint("[bold]Snapshot History:[/]")
         for ts in timestamps:
             rprint(f"  {ts}")
-
-
-def handle_shell_command(command: str, args: list[str]) -> None:
-    """Handle arbitrary shell commands by checking if they exist in the system."""
-    if not _is_valid_command(command):
-        rprint(f"[red]Error:[/] Command '{command}' is not found or not executable.")
-        return
-    
-    try:
-        cmd = [command] + args
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        if result.stdout.strip():
-            rprint(result.stdout)
-    except subprocess.CalledProcessError as e:
-        rprint(f"[red]Error running {command} {' '.join(args)}:[/] {e.stderr}")
-    except FileNotFoundError:
-        rprint(f"[red]Error:[/] {command} is not installed or not found in PATH.")
 
 
 def handle_diff_command(args: list[str]) -> None:
@@ -207,8 +223,35 @@ def handle_diff_command(args: list[str]) -> None:
         rprint("[red]Error:[/] Too many arguments for diff command.")
 
 
+def _python_diff_files(file1: Path, file2: Path) -> None:
+    """Show diff between two files using Python's difflib."""
+    try:
+        from difflib import unified_diff
+        
+        # Read file contents
+        content1 = file1.read_text().splitlines(keepends=True) if file1.exists() else []
+        content2 = file2.read_text().splitlines(keepends=True) if file2.exists() else []
+        
+        # Generate unified diff
+        diff = unified_diff(
+            content2,  # from file (snapshot)
+            content1,  # to file (current)
+            fromfile=str(file2),
+            tofile=str(file1)
+        )
+        
+        # Convert diff to string and print
+        diff_str = ''.join(diff)
+        if diff_str.strip():
+            _diff_console.print(diff_str)
+        else:
+            rprint("[green]No differences found.[/]")
+    except Exception as e:
+        rprint(f"[red]Error running Python diff:[/] {e}")
+
+
 def diff_files(file1: Path, file2: Path) -> None:
-    """Show diff between two files using system diff command."""
+    """Show diff between two files using system diff command or Python fallback."""
     try:
         result = subprocess.run(
             ["diff", "--color=always", "-u", str(file2), str(file1)],
@@ -221,7 +264,8 @@ def diff_files(file1: Path, file2: Path) -> None:
         else:
             rprint("[green]No differences found.[/]")
     except FileNotFoundError:
-        rprint("[red]Error:[/] 'diff' command not found. Please install diffutils.")
+        # Fallback to Python's difflib if system diff is not available
+        _python_diff_files(file1, file2)
     except Exception as e:
         rprint(f"[red]Error running diff:[/] {e}")
 
@@ -274,9 +318,9 @@ def handle_prune_cmd(keep: int = 10) -> None:
     try:
         deleted_count = prune_snapshots(keep)
         if deleted_count > 0:
-            rprint(f"\u2705 {deleted_count} snapshots deleted. {keep} most recent snapshots kept.")
+            rprint(f"✅ {deleted_count} snapshots deleted. {keep} most recent snapshots kept.")
         else:
-            rprint("\u2705 No snapshots deleted. You have fewer than the specified keep count.")
+            rprint("✅ No snapshots deleted. You have fewer than the specified keep count.")
     except Exception as e:
         rprint(f"[red]Error pruning snapshots:[/] {e}")
 
@@ -287,9 +331,9 @@ def handle_cleanup_cmd(days: int = 30) -> None:
     try:
         deleted_count = cleanup_snapshots(days)
         if deleted_count > 0:
-            rprint(f"\u2705 {deleted_count} snapshots older than {days} days deleted.")
+            rprint(f"✅ {deleted_count} snapshots older than {days} days deleted.")
         else:
-            rprint(f"\u2705 No snapshots older than {days} days found.")
+            rprint(f"✅ No snapshots older than {days} days found.")
     except Exception as e:
         rprint(f"[red]Error cleaning up snapshots:[/] {e}")
 

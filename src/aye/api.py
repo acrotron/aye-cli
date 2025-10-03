@@ -12,7 +12,7 @@ TIMEOUT = 30.0
 
 
 def _auth_headers() -> Dict[str, str]:
-    token = "aye_XXX" #get_token()
+    token = get_token()
     if not token:
         raise RuntimeError("No auth token – run `aye login` first.")
     return {"Authorization": f"Bearer {token}"}
@@ -27,3 +27,23 @@ def cli_invoke(user_id="v@acrotron.com", chat_id=-1, message="", source_files={}
         resp = client.post(url, json=payload, headers=_auth_headers())
         resp.raise_for_status()
         return resp.json()
+
+
+def fetch_plugin_manifest():
+    """Fetch the plugin manifest from the server."""
+    url = f"{BASE_URL}/plugins"
+    
+    with httpx.Client(timeout=TIMEOUT, verify=False) as client:
+        resp = client.post(url, headers=_auth_headers())
+        resp.raise_for_status()
+        return resp.json()
+
+
+def fetch_server_time() -> int:
+    """Fetch the current server timestamp."""
+    url = f"{BASE_URL}/time"
+    
+    with httpx.Client(timeout=TIMEOUT, verify=False) as client:
+        resp = client.get(url)
+        resp.raise_for_status()
+        return resp.json()['timestamp']
